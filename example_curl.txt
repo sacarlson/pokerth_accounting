@@ -1,0 +1,170 @@
+curl -X POST https://test.stellar.org:9002 -d '{"method":"create_keys"}'
+
+{
+  "result": {
+    "account_id": "gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E",
+    "master_seed": "sfiiw1CkYDjF5VE2EshFTp4qqC8pgnLDgU4he3Svnqm6EecYoZC",
+    "master_seed_hex": "5DBC4C92524E5BA19817DAC3647E0E2964D1606A5821FEB359282E44CF55B422",
+    "public_key": "pGeWbkeK6nfLzngoNbLhrNofWz4wCtJx3ts2cAUTa15ZHbBfokx",
+    "public_key_hex": "B95C3B60CDFB1CB80A45BA5ABB8578AEDB37E3B2435401BCA9C87CC54B8AD648",
+    "status": "success"
+  }
+}
+
+curl -X POST https://test.stellar.org:9002 -d \
+    '{"method":"account_info","params":[{"account":"gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E"}]}'
+
+{
+  "result": {
+    "account_data": {
+      "Account": "gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E",
+      "Balance": "1000000000",
+      "Flags": 0,
+      "LedgerEntryType": "AccountRoot",
+      "OwnerCount": 0,
+      "PreviousTxnID": "EBC399BC50C08E82D2FBA6BFD51F59261CDF2054DA887AF552EE9D13B43EBF6E",
+      "PreviousTxnLgrSeq": 943884,
+      "Sequence": 1,
+      "index": "14762BF90015F54B5D6DC062AFB8EDAFCFC95F61F24935B45C2644E25B5287ED"
+    },
+    "ledger_current_index": 943886,
+    "status": "success"
+  }
+}
+
+gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E
+sfiiw1CkYDjF5VE2EshFTp4qqC8pgnLDgU4he3Svnqm6EecYoZC
+
+curl -X POST https://test.stellar.org:9002 -d '
+{
+  "method": "submit",
+  "params": [
+    {
+      "secret": "sfwtwgV3zHekZMm6F2cNPzEGzogQqPMEZcdVftKnrstngZvotYr",
+      "tx_json": {
+        "TransactionType": "Payment",
+        "Account": "gM4Fpv2QuHY4knJsQyYGKEHFGw3eMBwc1U",
+        "Destination": "g4eRqgZfzfj3132y17iaf2fp6HQj1gofjt",
+        "Amount": {
+          "currency": "USD",
+          "value": "2",
+          "issuer": "gBAde4mkDijZatAdNhBzCsuC7GP4MzhA3B"
+        }
+      }
+    }
+  ]
+}' 
+
+{
+  "result": {
+    "engine_result": "tesSUCCESS",
+    "engine_result_code": 0,
+    "engine_result_message": "The transaction was applied.",
+    "status": "success",
+    "tx_blob": "120000228000000024000000D561D4871AFD498D0000000000000000000000000000555344000000000078064F19696F4ADD2438E27070E5EA51B4DD233668400000000000000A7320053DC64AE87B36159EA11EC9C387699E71596A4FE1FBD32EDE814D789E3F52217440934654FB6187BA810B36E417D26B2D1FC219E6D8C1BA7CB4DD63426605C01F55C1168C01C256410E3B457494BD2D6D77BDBA14ABCDD8BC49E9445D7042AB8A008114DF8286CDBB009AA5C29F526B5C3B4C480B44EABE8314ED6EC1D865CC2D4720B6CED71C42B4BA0E4E4B93",
+    "tx_json": {
+      "Account": "gM4Fpv2QuHY4knJsQyYGKEHFGw3eMBwc1U",
+      "Amount": {
+        "currency": "USD",
+        "issuer": "gBAde4mkDijZatAdNhBzCsuC7GP4MzhA3B",
+        "value": "2"
+      },
+      "Destination": "g4eRqgZfzfj3132y17iaf2fp6HQj1gofjt",
+      "Fee": "10",
+      "Flags": 2147483648,
+      "Sequence": 213,
+      "SigningPubKey": "053DC64AE87B36159EA11EC9C387699E71596A4FE1FBD32EDE814D789E3F5221",
+      "TransactionType": "Payment",
+      "TxnSignature": "934654FB6187BA810B36E417D26B2D1FC219E6D8C1BA7CB4DD63426605C01F55C1168C01C256410E3B457494BD2D6D77BDBA14ABCDD8BC49E9445D7042AB8A00",
+      "hash": "8608F0CAE96AB883AAC798E4476A6AC1800E21FC8221A2DA72AE06131B452154"
+    }
+  }
+}
+
+
+curl -X POST https://test.stellar.org:9002 -d '
+{
+  "method": "submit",
+  "params": [
+    {
+      "secret": "s3q5ZGX2ScQK2rJ4JATp7rND6X5npG3De8jMbB7tuvm2HAVHcCN",
+      "tx_json": {
+        "TransactionType": "OfferCreate",
+        "Account": "ganVp9o5emfzpwrG5QVUXqMv8AgLcdvySb",
+        "TakerGets": {
+          "currency": "USD",
+          "value": "1500",
+          "issuer": "ghj4kXtHfQcCaLQwpLJ11q2hq6248R7k9C"
+        },
+        "TakerPays": {
+          "currency": "BTC",
+          "value": "2.5",
+          "issuer": "ghj4kXtHfQcCaLQwpLJ11q2hq6248R7k9C"
+        }
+      }
+    }
+  ]
+}'
+
+{
+  "result": {
+    "engine_result": "tesSUCCESS",
+    "engine_result_code": 0,
+    "engine_result_message": "The transaction was applied.",
+    "status": "success",
+    "tx_blob": "120000228000000024000000D561D4871AFD498D0000000000000000000000000000555344000000000078064F19696F4ADD2438E27070E5EA51B4DD233668400000000000000A7320053DC64AE87B36159EA11EC9C387699E71596A4FE1FBD32EDE814D789E3F52217440934654FB6187BA810B36E417D26B2D1FC219E6D8C1BA7CB4DD63426605C01F55C1168C01C256410E3B457494BD2D6D77BDBA14ABCDD8BC49E9445D7042AB8A008114DF8286CDBB009AA5C29F526B5C3B4C480B44EABE8314ED6EC1D865CC2D4720B6CED71C42B4BA0E4E4B93",
+    "tx_json": {
+      "Account": "gM4Fpv2QuHY4knJsQyYGKEHFGw3eMBwc1U",
+      "Amount": {
+        "currency": "USD",
+        "issuer": "gBAde4mkDijZatAdNhBzCsuC7GP4MzhA3B",
+        "value": "2"
+      },
+      "Destination": "g4eRqgZfzfj3132y17iaf2fp6HQj1gofjt",
+      "Fee": "10",
+      "Flags": 2147483648,
+      "Sequence": 213,
+      "SigningPubKey": "053DC64AE87B36159EA11EC9C387699E71596A4FE1FBD32EDE814D789E3F5221",
+      "TransactionType": "Payment",
+      "TxnSignature": "934654FB6187BA810B36E417D26B2D1FC219E6D8C1BA7CB4DD63426605C01F55C1168C01C256410E3B457494BD2D6D77BDBA14ABCDD8BC49E9445D7042AB8A00",
+      "hash": "8608F0CAE96AB883AAC798E4476A6AC1800E21FC8221A2DA72AE06131B452154"
+    }
+  }
+}
+
+
+curl -X GET 'https://horizon-testnet.stellar.org/accounts/gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt'
+
+{
+  "_links": {
+    "effects": {
+      "href": "/accounts/gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt/effects/{?cursor,limit,order}",
+      "templated": true
+    },
+    "offers": {
+      "href": "/accounts/gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt/offers/{?cursor,limit,order}",
+      "templated": true
+    },
+    "operations": {
+      "href": "/accounts/gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt/operations/{?cursor,limit,order}",
+      "templated": true
+    },
+    "self": {
+      "href": "/accounts/gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt"
+    },
+    "transactions": {
+      "href": "/accounts/gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt/transactions/{?cursor,limit,order}",
+      "templated": true
+    }
+  },
+  "id": "gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt",
+  "paging_token": "628869111484416",
+  "address": "gsK1mmFpNrP4jFayF93Per3EKr2xEAyJed9DiQfavP4J7eXjxtt",
+  "sequence": 628869111480320,
+  "balances": [
+    {
+      "currency_type": "native",
+      "balance": 1000000000
+    }
+  ]
+}
