@@ -1,8 +1,11 @@
 #!/usr/bin/ruby
-
+require 'sys/proctable'
+include Sys
 require 'sqlite3'
+require './class_payment'
 # be sure to install these packages before you run this:
 # sudo apt-get install ruby-full sqlite3 ruby-sqlite3
+# gem install sys-proctable
 
 account_log_file="account_log.pdb"
 log_dir=File.expand_path('~/.pokerth/log-files/')+"/"
@@ -20,21 +23,48 @@ gamenumber=7
 win_count=0
 handID = 1
 
+def playername_info(player, full_account_log_file)
+  db = SQLite3::Database.open full_account_log_file
+  db.execute "PRAGMA journal_mode = WAL"
+  stm = db.prepare "SELECT * FROM Players WHERE Name = '#{player}' LIMIT 1" 
+  rs = stm.execute
+  rs.each do |row|
+    #puts "row = #{row}"
+    return row
+  end 
+end
+
+def playername_to_secret(player, full_account_log_file)
+  return playername_info(player, full_account_log_file)[4].to_s
+end
+
+def playername_to_accountID(player, full_account_log_file)
+  return playername_info(player, full_account_log_file)[3].to_s
+end
+
+#accountid = playername_to_secret("Player 3", full_account_log_file)
+#puts "acc = #{accountid}"
+#exit -1
+
 def update_account_log(full_account_log_file, log_file, playername,amount,gamenumber)
   #puts "playername = #{playername} amount #{amount}"
   amount = amount.round(2)
   begin    
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Players(Id INTEGER PRIMARY KEY, 
-        Name TEXT UNIQUE, Ballance INT, AccountID TEXT)"
+        Name TEXT UNIQUE, Ballance INT, AccountID TEXT, master_seed TEXT, AccBal INT, AccBalLast INT, AccDiff INT)"
     db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
-        Name TEXT, Amount INT, GameID INT, Log_file TEXT, Account TEXT, Time TEXT)"
+        Name TEXT, Amount INT, GameID INT, Log_file TEXT, AccountID TEXT, Time TEXT)"
 
     c = db.execute( "SELECT count(*) FROM Players WHERE Name = 'Total_sent'")
     #puts "c = #{c[0][0]}"
     exists = c[0][0]
     if exists == 0
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}',NULL)"
+      stellar = Payment.new
+      stellar.create_keys
+      #puts "#{stellar.last_key_account_id}"
+      #puts "#{stellar.last_key_master_seed}"
+      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{stellar.last_key_account_id}','#{stellar.last_key_master_seed}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = 'Total_sent'"
     end
@@ -43,14 +73,18 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
     #puts "c = #{c[0][0]}"
     exists = c[0][0]
     if exists == 0
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}',NULL)"
+      stellar = Payment.new
+      stellar.create_keys
+      #puts "#{stellar.last_key_account_id}"
+      #puts "#{stellar.last_key_master_seed}"
+      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{stellar.last_key_account_id}','#{stellar.last_key_master_seed}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'"
     end
     timestr = DateTime.now
     #puts "time = #{timestr}"
- 
-    db.execute("INSERT INTO Events VALUES(NULL,'#{playername}','#{amount}','#{gamenumber}','#{log_file}',NULL, '#{timestr}')")
+    accountID = playername_to_accountID(playername, full_account_log_file)
+    db.execute("INSERT INTO Events VALUES(NULL,'#{playername}','#{amount}','#{gamenumber}','#{log_file}','#{accountID}', '#{timestr}')")
 
     
     
@@ -67,6 +101,16 @@ end
 
 #update_account_log(full_account_log_file,playername,amount,gamenumber)
 #exit -1
+
+
+def proc_exists(procname)
+  Sys::ProcTable.ps.each { |ps|
+    if ps.name.downcase == procname    
+      return TRUE
+    end
+  }
+  return FALSE
+end
 
 def get_start_cash(log_file, gamenumber)
 
@@ -98,7 +142,7 @@ end
 def find_last_log_file(dir_name)
   Dir.chdir dir_name
   filename = Dir.glob("*").max_by {|f| File.mtime(f)}
-  puts "las log filename = #{filename}"
+  puts "last log filename = #{filename}"
   return filename
 end
 
@@ -225,6 +269,25 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   playername = seatnumber_to_player( seat, gamenumber, log_file)
   puts "send player #{playername} in seat #{seat}  #{amount} amount of chips"
   update_account_log(account_file,log_file,playername,amount,gamenumber)
+  # to enable sending stellar set bellow if TRUE
+  if TRUE 
+    send_to_accountid = playername_to_accountID(playername, account_file)
+    from_acc_accountid = playername_to_accountID("Total_sent", account_file)
+    from_acc_secret = playername_to_secret("Total_sent", account_file)
+    stellar = Payment.new
+    amount = amount * 1000000
+    puts "will be sending #{amount.to_i} to stellar"
+    stellar.set_value(amount.to_i)
+    #stellar.set_issuer("")
+    stellar.set_currency("native")
+    stellar.set_secret(from_acc_secret)
+    stellar.set_account(from_acc_accountid)
+    stellar.set_destination(send_to_accountid)
+    status = stellar.send
+    puts "send stellar status #{status}"
+    #sleep 10
+    #acc_bal = stellar.check_balance
+  end  
 end
 #name = seatnumber_to_player(8,5,log_file)
 #puts "name = #{name}"
@@ -393,10 +456,15 @@ def run_loop(log_dir,account_dir)
     if newgamenumber != gamenumber
       break
     end
+    if proc_exists("pokerth") == FALSE
+      puts "pokerth no longer running will exit now"
+      break
+    end
     sleep(5)
   end
 
 end
+
 
 run_loop(log_dir,account_dir)
 

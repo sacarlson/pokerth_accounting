@@ -1,10 +1,10 @@
 #!/usr/bin/ruby
 # payment system for stellar network
+#(c) 2015 by sacarlson  sacarlson_2000@yahoo.com
 # gem install rest-client
 # gem install json
 require 'json'
 require 'rest-client'
-#require 'pp'
 
 class Payment
 
@@ -39,6 +39,28 @@ class Payment
     @net["server_port"]=port
   end
 
+  def create_keys
+    data = '{"method":"create_keys"}'
+    url = self.server_urlport
+    postdat = RestClient.post url, data
+    data = JSON.parse(postdat)
+    @last_key = data
+    stat = data["result"]["status"].to_s
+    if stat == "success"
+      return data
+    else
+      return "fail"
+    end 
+  end
+
+  def last_key_account_id
+    return @last_key["result"]["account_id"]
+  end
+ 
+  def last_key_master_seed
+    return @last_key["result"]["master_seed"]
+  end
+   
   def show
     puts "transaction '#{@data}'"
   end  
@@ -74,6 +96,7 @@ class Payment
     url = self.server_urlport
     postdat = RestClient.post url, send
     data = JSON.parse(postdat)
+    #puts "#{data}}"
     stat = data["result"]["status"].to_s
     if stat == "success"     
       return data["result"]["account_data"]["Balance"].to_s    
@@ -103,32 +126,33 @@ class Payment
   end
 end
 
-#curl -X POST https://test.stellar.org:9002 -d 
-#data = '{"method":"submit","params":[{"secret":"sfiiw1CkYDjF5VE2EshFTp4qqC8pgnLDgU4he3Svnqm6EecYoZC","tx_json":##{"TransactionType":"Payment","Account":"gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E","Destination":"ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza","Amount":"25"}}]}'
-#url = "https://test.stellar.org:9002"
-#puts "#{RestClient.post url, data}"
-
-exit -1
+__END__
 # examples
 stellar = Payment.new
+#data = stellar.create_keys
+#puts "#{stellar.last_key_account_id}"
+#puts "#{stellar.last_key_master_seed}"
+#puts "#{data}"
+#exit -1
 #stellar.set_server_url("horizon-testnet.stellar.org")
-stellar.set_value(250)
-# note you must put value before currency set or it won't work (need to fix)
-stellar.set_issuer("")
-stellar.set_currency("native")
-stellar.set_secret("sfiiw1CkYDjF5VE2EshFTp4qqC8pgnLDgU4he3Svnqm6EecYoZC")
-stellar.set_account("gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E")
-stellar.set_destination("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
+#stellar.set_value(250)
+#stellar.set_issuer("")
+#stellar.set_currency("native")
+#stellar.set_secret("sfiiw1CkYDjF5VE2EshFTp4qqC8pgnLDgU4he3Svnqm6EecYoZC")
+#stellar.set_account("gNtpACgipxdc7UV1aGsCmSpKLVheuxrBzG")  bad account not found
+#stellar.set_account("gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E")
+stellar.set_account("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
+#stellar.set_destination("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
 
 data = stellar.check_balance
 puts "#{data}"
-
+exit -1
 puts "#{stellar.send}"
 
 sleep 10
 puts "#{stellar.check_balance}"
 #stellar.show
-#stellar.set_server_test
+#stellar.set_server_live
 #puts "#{stellar.server_urlport}"
 
 #puts "#{stellar.to_json}"
