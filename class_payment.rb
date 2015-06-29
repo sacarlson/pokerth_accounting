@@ -18,7 +18,7 @@ class Payment
   end  
   
   def server_urlport
-    return @net["server_url"]+":"+@net["server_port"]
+    return @net["server_url"]+":"+@net["server_port"].to_s    
   end
 
   def set_server_url(url)
@@ -89,16 +89,34 @@ class Payment
    @data["params"][0]["tx_json"]["Destination"] = dest
   end
 
+  def set_trust
+    puts "start set_trust"
+    hash = {"method"=>"submit", "params"=>[{"secret"=>"s3wmY....", "tx_json"=>{"TransactionType"=>"TrustSet", "Account"=>"gnwV....", "LimitAmount"=>{"currency"=>"CHP", "value"=>"1e+19", "issuer"=>"gBAd...."}, "Flags"=>131072}}]}
+    #puts "#{hash["params"][0]["tx_json"]["LimitAmount"]["issuer"]}"
+    hash["params"][0]["tx_json"]["LimitAmount"]["issuer"] = @data["params"][0]["tx_json"]["Amount"]["issuer"]
+    hash["params"][0]["secret"] = @data["params"][0]["secret"]
+    hash["params"][0]["tx_json"]["Account"] = @data["params"][0]["tx_json"]["Account"]
+    hash["params"][0]["tx_json"]["LimitAmount"]["currency"] = @data["params"][0]["tx_json"]["Amount"]["currency"]
+    #puts "#{hash}"
+    return self.send_hash(hash)
+  end
+
+  def account_lines
+    hash = {"method"=>"account_lines", "params"=>[{"account"=>"ghr1...."}]}
+    hash["params"][0]["account"] = @data["params"][0]["tx_json"]["Account"]
+    return self.send_hash(hash)
+  end
+
   def check_balance
     data = '{"method":"account_info","params":[{"account":"'
     send = data + @data["params"][0]["tx_json"]["Account"] + '"}]}'
-    data = self.to_json
     url = self.server_urlport
     postdat = RestClient.post url, send
     data = JSON.parse(postdat)
     #puts "#{data}}"
     stat = data["result"]["status"].to_s
-    if stat == "success"     
+    if stat == "success" 
+      puts "#{data}"    
       return data["result"]["account_data"]["Balance"].to_s    
     else
       return "fail"
@@ -118,12 +136,22 @@ class Payment
     postdat = RestClient.post url, data
     data = JSON.parse(postdat)
     stat = data["result"]["status"].to_s
+    #puts "send data #{data}"
     if stat == "success"
-      return "ok"
+      return data
     else
       return "fail"
     end   
   end
+
+  def send_hash(hash)
+    data = hash.to_json
+    url = self.server_urlport
+    postdat = RestClient.post url, data
+    data = JSON.parse(postdat)
+    puts "#{data}"    
+    return data    
+  end   
 end
 
 __END__
@@ -134,19 +162,17 @@ stellar = Payment.new
 #puts "#{stellar.last_key_master_seed}"
 #puts "#{data}"
 #exit -1
-#stellar.set_server_url("horizon-testnet.stellar.org")
 #stellar.set_value(250)
 #stellar.set_issuer("")
 #stellar.set_currency("native")
-#stellar.set_secret("sfiiw1CkYDjF5VE2EshFTp4qqC8pgnLDgU4he3Svnqm6EecYoZC")
-#stellar.set_account("gNtpACgipxdc7UV1aGsCmSpKLVheuxrBzG")  bad account not found
+
 #stellar.set_account("gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E")
 stellar.set_account("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
 #stellar.set_destination("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
 
 data = stellar.check_balance
 puts "#{data}"
-exit -1
+
 puts "#{stellar.send}"
 
 sleep 10

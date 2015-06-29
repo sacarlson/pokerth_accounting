@@ -23,6 +23,48 @@ gamenumber=7
 win_count=0
 handID = 1
 
+def create_new_active_account(acc_issuer_pair)
+  # this will create a new random account number pair
+  # it will deposit 30_000000 lunes into it to allow transactions on the new account. from lunes taken from the acc_issuer account
+  # it will return with a hash {"Account"=>"gj5D....","secret"=>"s3x6v...."} of the newly created account
+  new_pair = {"Account"=>"ghr1b....", "secret"=>"s3x6v....."}
+  stellar = Payment.new
+  stellar.create_keys
+  new_pair["Account"] = stellar.last_key_account_id
+  new_pair["secret"] = stellar.last_key_master_seed
+  puts "new_pair #{new_pair}"
+  stellar.set_account(acc_issuer_pair["Account"])
+  stellar.set_secret(acc_issuer_pair["secret"])
+  stellar.set_currency("native")
+  stellar.set_value(30000000)
+  stellar.set_destination(new_pair["Account"])
+  status = stellar.send
+  puts "status #{status}"
+  return new_pair
+end
+
+def add_CHP_trust(from_issuer_pair,to_pair)
+  # this will setup trust to to_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."} for CHP currency
+  # it will then deposit 1_000000 CHP's into it from the from_issuer_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."}
+  stellar = Payment.new
+  stellar.set_account(to_pair["Account"])
+  stellar.set_secret(to_pair["secret"])
+  data = stellar.check_balance
+  puts "#{data}"
+  stellar.set_issuer(from_issuer_pair["Account"])
+  stellar.set_currency("CHP")
+  stellar.set_trust
+  #sleep 10
+  stellar.set_account(from_issuer_pair["Account"])
+  stellar.set_secret(from_issuer_pair["secret"])
+  stellar.set_trust
+  stellar.set_value(1000000)
+  stellar.set_destination(to_pair["Account"])
+  status = stellar.send
+  #puts "status = #{status}"
+  return status
+end
+
 def playername_info(player, full_account_log_file)
   db = SQLite3::Database.open full_account_log_file
   db.execute "PRAGMA journal_mode = WAL"
