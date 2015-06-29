@@ -135,13 +135,9 @@ class Payment
     url = self.server_urlport
     postdat = RestClient.post url, data
     data = JSON.parse(postdat)
-    stat = data["result"]["status"].to_s
-    #puts "send data #{data}"
-    if stat == "success"
-      return data
-    else
-      return "fail"
-    end   
+    #stat = data["result"]["status"].to_s
+    #puts "send data #{data}"    
+    return data   
   end
 
   def send_hash(hash)

@@ -26,5 +26,8 @@ stm = db.prepare "SELECT * FROM Players "
         puts "AccBal = #{ballance}"       
         puts "playername #{playername}"
         db.execute("UPDATE Players SET AccBal = #{ballance} WHERE Name = '#{playername}'")
+        data = stellar.account_lines
+        chp_bal = data["result"]["lines"][0]["balance"]
+        db.execute("UPDATE Players SET AccDiff = #{chp_bal} WHERE Name = '#{playername}'")
       end      
     end   

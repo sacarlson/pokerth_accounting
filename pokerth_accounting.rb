@@ -43,26 +43,45 @@ def create_new_active_account(acc_issuer_pair)
   return new_pair
 end
 
+
+
 def add_CHP_trust(from_issuer_pair,to_pair)
   # this will setup trust to to_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."} for CHP currency
-  # it will then deposit 1_000000 CHP's into it from the from_issuer_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."}
+  # it will also setup trust on the from_issuer_pair to to_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."}
+  #new_pair = {"Account"=>"ghr1b....", "secret"=>"s3x6v....."}
   stellar = Payment.new
-  stellar.set_account(to_pair["Account"])
-  stellar.set_secret(to_pair["secret"])
-  data = stellar.check_balance
-  puts "#{data}"
-  stellar.set_issuer(from_issuer_pair["Account"])
-  stellar.set_currency("CHP")
-  stellar.set_trust
-  #sleep 10
   stellar.set_account(from_issuer_pair["Account"])
   stellar.set_secret(from_issuer_pair["secret"])
+  #data = stellar.check_balance
+  #puts "#{data}"
+  stellar.set_issuer(from_issuer_pair["Account"])
+  stellar.set_currency("CHP")
+  stellar.set_trust 
+  stellar.set_account(to_pair["Account"])
+  stellar.set_secret(to_pair["secret"])
   stellar.set_trust
-  stellar.set_value(1000000)
-  stellar.set_destination(to_pair["Account"])
+end
+
+def send_CHP(from_issuer_pair, to_account, amount)
+  # pairs {"Account"=>"gj5D....","secret"=>"s3x6v...."}
+  stellar = Payment.new
+  stellar.set_account(from_issuer_pair["Account"])
+  stellar.set_secret(from_issuer_pair["secret"])
+  stellar.set_currency("CHP")
+  stellar.set_issuer(from_issuer_pair["Account"])
+  #stellar.set_trust
+  stellar.set_value(amount)
+  stellar.set_destination(to_account)
   status = stellar.send
   #puts "status = #{status}"
   return status
+end
+
+def create_new_account_with_CHP_trust(acc_issuer_pair)
+  new_pair = create_new_active_account(acc_issuer_pair)
+  sleep 11
+  add_CHP_trust(acc_issuer_pair,new_pair)
+  return new_pair
 end
 
 def playername_info(player, full_account_log_file)
@@ -102,11 +121,10 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
     #puts "c = #{c[0][0]}"
     exists = c[0][0]
     if exists == 0
-      stellar = Payment.new
-      stellar.create_keys
-      #puts "#{stellar.last_key_account_id}"
-      #puts "#{stellar.last_key_master_seed}"
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{stellar.last_key_account_id}','#{stellar.last_key_master_seed}',NULL, NULL,NULL)"
+
+      new_pair = create_new_account_with_CHP_trust(acc_issuer_pair)
+      
+      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["Account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = 'Total_sent'"
     end
@@ -115,11 +133,12 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
     #puts "c = #{c[0][0]}"
     exists = c[0][0]
     if exists == 0
-      stellar = Payment.new
-      stellar.create_keys
-      #puts "#{stellar.last_key_account_id}"
-      #puts "#{stellar.last_key_master_seed}"
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{stellar.last_key_account_id}','#{stellar.last_key_master_seed}',NULL, NULL,NULL)"
+      acc_issuer_account = playername_to_accountID("Total_sent", full_account_log_file)
+      acc_issuer_secret = playername_to_secret("Total_sent", full_account_log_file)
+      acc_issuer_pair = {"Account"=>acc_issuer_account, "secret"=>acc_issuer_secret}
+      new_pair = create_new_account_with_CHP_trust(acc_issuer_pair)
+      puts "new_pair = #{new_pair}"
+      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["Account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'"
     end
@@ -311,24 +330,18 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   playername = seatnumber_to_player( seat, gamenumber, log_file)
   puts "send player #{playername} in seat #{seat}  #{amount} amount of chips"
   update_account_log(account_file,log_file,playername,amount,gamenumber)
-  # to enable sending stellar set bellow if TRUE
-  if TRUE 
+  # to enable sending stellar set bellow if to TRUE
+  if TRUE
     send_to_accountid = playername_to_accountID(playername, account_file)
     from_acc_accountid = playername_to_accountID("Total_sent", account_file)
     from_acc_secret = playername_to_secret("Total_sent", account_file)
+    from_issuer_pair = {"Account"=>from_acc_accountid, "secret"=>from_acc_secret}
+    send_CHP(from_issuer_pair, send_to_accountid, amount)
+    sleep 10
     stellar = Payment.new
-    amount = amount * 1000000
-    puts "will be sending #{amount.to_i} to stellar"
-    stellar.set_value(amount.to_i)
-    #stellar.set_issuer("")
-    stellar.set_currency("native")
-    stellar.set_secret(from_acc_secret)
-    stellar.set_account(from_acc_accountid)
-    stellar.set_destination(send_to_accountid)
-    status = stellar.send
-    puts "send stellar status #{status}"
-    #sleep 10
-    #acc_bal = stellar.check_balance
+    stellar.set_account(send_to_accountid)
+    data = stellar.account_lines
+    puts "after deposit #{data}"
   end  
 end
 #name = seatnumber_to_player(8,5,log_file)
