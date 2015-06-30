@@ -32,31 +32,46 @@ def create_new_active_account(acc_issuer_pair)
   stellar.create_keys
   new_pair["Account"] = stellar.last_key_account_id
   new_pair["secret"] = stellar.last_key_master_seed
-  puts "new_pair #{new_pair}"
-  stellar.set_account(acc_issuer_pair["Account"])
-  stellar.set_secret(acc_issuer_pair["secret"])
-  stellar.set_currency("native")
-  stellar.set_value(30000000)
-  stellar.set_destination(new_pair["Account"])
-  status = stellar.send
-  puts "status #{status}"
+  amount = 30000000
+  send_native(acc_issuer_pair, new_pair["Account"], amount)
+  sleep 10
+  stellar.set_account(new_pair["Account"])
+  data = stellar.check_balance
+  puts "ballance check #{data}"
+  if data.to_i < 20000000
+    puts "still no transaction seen will wait 10 more sec"
+    sleep 10
+    data = stellar.check_balance
+    if data.to_i < 20000000
+      puts "20 sec no trans, must be problem so send again"
+      send_native(acc_issuer_pair, new_pair["Account"], amount)
+      sleep 15
+    end
+    data = stellar.check_balance
+    puts "ballance check #{data}"
+  end
   return new_pair
 end
 
-
-
-def add_CHP_trust(from_issuer_pair,to_pair)
-  # this will setup trust to to_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."} for CHP currency
-  # it will also setup trust on the from_issuer_pair to to_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."}
-  #new_pair = {"Account"=>"ghr1b....", "secret"=>"s3x6v....."}
+def send_native(from_issuer_pair, to_account, amount)
   stellar = Payment.new
   stellar.set_account(from_issuer_pair["Account"])
   stellar.set_secret(from_issuer_pair["secret"])
-  #data = stellar.check_balance
-  #puts "#{data}"
-  stellar.set_issuer(from_issuer_pair["Account"])
+  stellar.set_currency("native")
+  #stellar.set_issuer(from_issuer_pair["Account"])
+  stellar.set_value(amount)
+  stellar.set_destination(to_account)
+  status = stellar.send
+  #puts "status = #{status}"
+  return status
+end
+
+
+def add_CHP_trust(issuer_account,to_pair)
+  # this will setup trust to accept CHP currency from from_issuer_pair account to to_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."} 
+  stellar = Payment.new
+  stellar.set_issuer(issuer_account)
   stellar.set_currency("CHP")
-  stellar.set_trust 
   stellar.set_account(to_pair["Account"])
   stellar.set_secret(to_pair["secret"])
   stellar.set_trust
@@ -69,7 +84,6 @@ def send_CHP(from_issuer_pair, to_account, amount)
   stellar.set_secret(from_issuer_pair["secret"])
   stellar.set_currency("CHP")
   stellar.set_issuer(from_issuer_pair["Account"])
-  #stellar.set_trust
   stellar.set_value(amount)
   stellar.set_destination(to_account)
   status = stellar.send
@@ -79,8 +93,7 @@ end
 
 def create_new_account_with_CHP_trust(acc_issuer_pair)
   new_pair = create_new_active_account(acc_issuer_pair)
-  sleep 11
-  add_CHP_trust(acc_issuer_pair,new_pair)
+  add_CHP_trust(acc_issuer_pair["Account"],new_pair)
   return new_pair
 end
 

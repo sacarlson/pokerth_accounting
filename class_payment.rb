@@ -145,7 +145,7 @@ class Payment
     url = self.server_urlport
     postdat = RestClient.post url, data
     data = JSON.parse(postdat)
-    puts "#{data}"    
+    #puts "#{data}"    
     return data    
   end   
 end
