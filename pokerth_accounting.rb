@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+#(c) 2015 by sacarlson  sacarlson_2000@yahoo.com
 require 'sys/proctable'
 include Sys
 require 'sqlite3'
@@ -23,79 +24,27 @@ gamenumber=7
 win_count=0
 handID = 1
 
-def create_new_active_account(acc_issuer_pair)
-  # this will create a new random account number pair
-  # it will deposit 30_000000 lunes into it to allow transactions on the new account. from lunes taken from the acc_issuer account
-  # it will return with a hash {"Account"=>"gj5D....","secret"=>"s3x6v...."} of the newly created account
-  new_pair = {"Account"=>"ghr1b....", "secret"=>"s3x6v....."}
-  stellar = Payment.new
-  stellar.create_keys
-  new_pair["Account"] = stellar.last_key_account_id
-  new_pair["secret"] = stellar.last_key_master_seed
-  amount = 30000000
-  send_native(acc_issuer_pair, new_pair["Account"], amount)
-  sleep 10
-  stellar.set_account(new_pair["Account"])
-  data = stellar.check_balance
-  puts "ballance check #{data}"
-  if data.to_i < 20000000
-    puts "still no transaction seen will wait 10 more sec"
-    sleep 10
-    data = stellar.check_balance
-    if data.to_i < 20000000
-      puts "20 sec no trans, must be problem so send again"
-      send_native(acc_issuer_pair, new_pair["Account"], amount)
-      sleep 15
-    end
-    data = stellar.check_balance
-    puts "ballance check #{data}"
+
+def send_surething_player_acc(playernick,stellar_acc)
+  url = "test.surething.biz/player_list" 
+  postdata = RestClient.get url + "?playernick=" + playernick +"&account="+ stellar_acc
+  return JSON.parse(postdata)
+end
+
+def update_players_accounts(full_account_log_file, playernick, stellar_ACC)
+  data = send_surething_player_acc(playernick,stellar_ACC)
+  #puts "#{data}"
+  db = SQLite3::Database.open full_account_log_file
+  data.each do |row|
+    #puts "row = #{row}"
+    #puts "#{row[1] +"  " + row[2]}"
+    playername = row[1]
+    stellar_acc = row[2]
+    db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}',NULL,'#{stellar_acc}',NULL,NULL, NULL,NULL)"
   end
-  return new_pair
+  db.close if db
 end
 
-def send_native(from_issuer_pair, to_account, amount)
-  stellar = Payment.new
-  stellar.set_account(from_issuer_pair["Account"])
-  stellar.set_secret(from_issuer_pair["secret"])
-  stellar.set_currency("native")
-  #stellar.set_issuer(from_issuer_pair["Account"])
-  stellar.set_value(amount)
-  stellar.set_destination(to_account)
-  status = stellar.send
-  #puts "status = #{status}"
-  return status
-end
-
-
-def add_CHP_trust(issuer_account,to_pair)
-  # this will setup trust to accept CHP currency from from_issuer_pair account to to_pair hash {"Account"=>"gj5D....","secret"=>"s3x6v...."} 
-  stellar = Payment.new
-  stellar.set_issuer(issuer_account)
-  stellar.set_currency("CHP")
-  stellar.set_account(to_pair["Account"])
-  stellar.set_secret(to_pair["secret"])
-  stellar.set_trust
-end
-
-def send_CHP(from_issuer_pair, to_account, amount)
-  # pairs {"Account"=>"gj5D....","secret"=>"s3x6v...."}
-  stellar = Payment.new
-  stellar.set_account(from_issuer_pair["Account"])
-  stellar.set_secret(from_issuer_pair["secret"])
-  stellar.set_currency("CHP")
-  stellar.set_issuer(from_issuer_pair["Account"])
-  stellar.set_value(amount)
-  stellar.set_destination(to_account)
-  status = stellar.send
-  #puts "status = #{status}"
-  return status
-end
-
-def create_new_account_with_CHP_trust(acc_issuer_pair)
-  new_pair = create_new_active_account(acc_issuer_pair)
-  add_CHP_trust(acc_issuer_pair["Account"],new_pair)
-  return new_pair
-end
 
 def playername_info(player, full_account_log_file)
   db = SQLite3::Database.open full_account_log_file
@@ -158,9 +107,7 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
     timestr = DateTime.now
     #puts "time = #{timestr}"
     accountID = playername_to_accountID(playername, full_account_log_file)
-    db.execute("INSERT INTO Events VALUES(NULL,'#{playername}','#{amount}','#{gamenumber}','#{log_file}','#{accountID}', '#{timestr}')")
-
-    
+    db.execute("INSERT INTO Events VALUES(NULL,'#{playername}','#{amount}','#{gamenumber}','#{log_file}','#{accountID}', '#{timestr}')")   
     
   rescue SQLite3::Exception => e 
     
