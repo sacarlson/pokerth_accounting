@@ -16,7 +16,7 @@ full_account_log_file=account_dir+account_log_file
 
 
 # these values were just for function test setup only
-log_file="/home/sacarlson/.pokerth/accounts/pokerth-log-2015-06-23_093113.pdb"
+log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-06-30_143148.pdb"
 playername="sacarlson2"
 amount=100
 start_cash=10000
@@ -31,9 +31,9 @@ def send_surething_player_acc(playernick,stellar_acc)
   return JSON.parse(postdata)
 end
 
-def update_players_accounts(full_account_log_file, playernick, stellar_ACC)
-  data = send_surething_player_acc(playernick,stellar_ACC)
-  #puts "#{data}"
+def update_players_accounts(full_account_log_file, playernick, stellar_acc)
+  puts "#{full_account_log_file}"
+  data = send_surething_player_acc(playernick,stellar_acc)
   db = SQLite3::Database.open full_account_log_file
   data.each do |row|
     #puts "row = #{row}"
@@ -46,10 +46,10 @@ def update_players_accounts(full_account_log_file, playernick, stellar_ACC)
 end
 
 
-def playername_info(player, full_account_log_file)
+def playername_info(playername, full_account_log_file)
   db = SQLite3::Database.open full_account_log_file
   db.execute "PRAGMA journal_mode = WAL"
-  stm = db.prepare "SELECT * FROM Players WHERE Name = '#{player}' LIMIT 1" 
+  stm = db.prepare "SELECT * FROM Players WHERE Name = '#{playername}' LIMIT 1" 
   rs = stm.execute
   rs.each do |row|
     #puts "row = #{row}"
@@ -57,17 +57,87 @@ def playername_info(player, full_account_log_file)
   end 
 end
 
-def playername_to_secret(player, full_account_log_file)
-  return playername_info(player, full_account_log_file)[4].to_s
+def playername_to_secret(playername, full_account_log_file)
+  return playername_info(playername, full_account_log_file)[4].to_s
 end
 
-def playername_to_accountID(player, full_account_log_file)
-  return playername_info(player, full_account_log_file)[3].to_s
+def playername_to_accountID(playername, full_account_log_file)
+  return playername_info(playername, full_account_log_file)[3].to_s
 end
 
-#accountid = playername_to_secret("Player 3", full_account_log_file)
-#puts "acc = #{accountid}"
+
+def get_playernick(log_file)
+    # this is to get the nickname you call yourself in the game from pokerth
+    puts "log_file = #{log_file}"
+    db = SQLite3::Database.open log_file
+    db.execute "PRAGMA journal_mode = WAL"
+    stm = db.prepare "SELECT * FROM Player WHERE Seat='1' LIMIT 2" 
+    rs = stm.execute
+    rs.each do |row|
+      #puts "row = #{row}"
+      puts "row[2] = #{row[2]}"
+      return row[2]
+    end   
+end
+
+#puts "#{get_playernick(log_file)}"
 #exit -1
+
+
+def get_configs(full_account_log_file, log_file)
+  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"test.surething.biz/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}}
+  begin    
+    db = SQLite3::Database.open full_account_log_file
+    db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
+        PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT)"
+    
+    c = db.execute( "SELECT count(*) FROM Configs ")
+   
+    #puts "c = #{c[0][0]}"
+    exists = c[0][0]
+    if exists == 0
+       puts "got here not exist"
+      playernick = get_playernick(log_file)
+      puts "playernick = #{playernick}"
+      acc_pair = create_new_account()
+      config_hash["playernick"]=playernick
+      config_hash["account"]=acc_pair["account"]
+      config_hash["secreet"]=acc_pair["secreet"]
+      config_hash["acc_pair"]=acc_pair
+      db.execute "INSERT or REPLACE INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
+    else
+      puts "got here does exist"
+      db.execute "PRAGMA journal_mode = WAL"
+      rs = db.execute "SELECT * FROM Configs " 
+      rs.each do |row|
+        puts "row = #{row}"
+        puts "row[2] = #{row[2]}"
+        config_hash["new"]=FALSE
+        config_hash["playernick"]=row[1]
+        config_hash["account"]=row[2]
+        config_hash["secreet"]=row[3]
+        config_hash["acc_pair"]={"account"=>row[2], "secret"=>row[3]} 
+        config_hash["currency"]=row[4]  
+        config_hash["paymenturl"]=row[5]
+        config_hash["stellarissuer"]=row[6]
+        config_hash["accountserver"]=row[7]     
+      end   
+    end
+
+  rescue SQLite3::Exception => e 
+    
+    puts "Exception occurred in get_configs "
+    puts e
+    
+  ensure
+    db.close if db
+  end
+  db.close if db
+  return config_hash
+end
+
+ #puts "#{get_configs(full_account_log_file, log_file)}"
+ #exit -1
 
 def update_account_log(full_account_log_file, log_file, playername,amount,gamenumber)
   #puts "playername = #{playername} amount #{amount}"
@@ -86,7 +156,7 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
 
       new_pair = create_new_account_with_CHP_trust(acc_issuer_pair)
       
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["Account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
+      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = 'Total_sent'"
     end
@@ -97,10 +167,10 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
     if exists == 0
       acc_issuer_account = playername_to_accountID("Total_sent", full_account_log_file)
       acc_issuer_secret = playername_to_secret("Total_sent", full_account_log_file)
-      acc_issuer_pair = {"Account"=>acc_issuer_account, "secret"=>acc_issuer_secret}
+      acc_issuer_pair = {"account"=>acc_issuer_account, "secret"=>acc_issuer_secret}
       new_pair = create_new_account_with_CHP_trust(acc_issuer_pair)
       puts "new_pair = #{new_pair}"
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["Account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
+      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'"
     end
@@ -132,6 +202,7 @@ def proc_exists(procname)
   }
   return FALSE
 end
+
 
 def get_start_cash(log_file, gamenumber)
 
@@ -292,16 +363,18 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   update_account_log(account_file,log_file,playername,amount,gamenumber)
   # to enable sending stellar set bellow if to TRUE
   if TRUE
+    config = get_configs(account_file, log_file)
     send_to_accountid = playername_to_accountID(playername, account_file)
-    from_acc_accountid = playername_to_accountID("Total_sent", account_file)
-    from_acc_secret = playername_to_secret("Total_sent", account_file)
-    from_issuer_pair = {"Account"=>from_acc_accountid, "secret"=>from_acc_secret}
-    send_CHP(from_issuer_pair, send_to_accountid, amount)
-    sleep 10
+    from_acc_accountid = config["account"]
+    from_acc_secret = config["secret"]
+    from_issuer_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
+    #send_CHP(from_issuer_pair, send_to_accountid, amount)
+    send_currency(from_issuer_pair, send_to_accountid, amount,config["currency"])
+    sleep 12
     stellar = Payment.new
     stellar.set_account(send_to_accountid)
     data = stellar.account_lines
-    puts "after deposit #{data}"
+    puts "after deposit lines #{data}"
   end  
 end
 #name = seatnumber_to_player(8,5,log_file)
@@ -480,6 +553,13 @@ def run_loop(log_dir,account_dir)
 
 end
 
+log_file = find_last_log_file(log_dir)
+full_log_file = log_dir+log_file
+conf = get_configs(full_account_log_file, full_log_file)
+puts "#{conf}"
 
+
+update_players_accounts(full_account_log_file, conf["playernick"],conf["account"])
+  
 run_loop(log_dir,account_dir)
 
