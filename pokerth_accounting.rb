@@ -25,15 +25,18 @@ win_count=0
 handID = 1
 
 
-def send_surething_player_acc(playernick,stellar_acc)
-  url = "test.surething.biz/player_list" 
-  postdata = RestClient.get url + "?playernick=" + playernick +"&account="+ stellar_acc
+def send_surething_player_acc(playernick,stellar_acc,urlaccountserver)
+  #url = "poker.surething.biz/player_list"
+  playernick = "test25" 
+  puts "send_sure #{playernick}"
+  postdata = RestClient.get urlaccountserver + "?playernick=" + playernick +"&account="+ stellar_acc
   return JSON.parse(postdata)
 end
 
-def update_players_accounts(full_account_log_file, playernick, stellar_acc)
+def update_players_accounts(full_account_log_file, playernick, stellar_acc,accountserver)
   puts "#{full_account_log_file}"
-  data = send_surething_player_acc(playernick,stellar_acc)
+  data = send_surething_player_acc(playernick,stellar_acc,accountserver)
+  puts "update #{data}"
   db = SQLite3::Database.open full_account_log_file
   data.each do |row|
     #puts "row = #{row}"
@@ -85,7 +88,7 @@ end
 
 
 def get_configs(full_account_log_file, log_file)
-  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"test.surething.biz/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}}
+  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"poker.surething.biz/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}}
   begin    
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
@@ -559,7 +562,17 @@ conf = get_configs(full_account_log_file, full_log_file)
 puts "#{conf}"
 
 
-update_players_accounts(full_account_log_file, conf["playernick"],conf["account"])
+update_players_accounts(full_account_log_file, conf["playernick"],conf["account"],conf["accountserver"])
+
+bal = bal_CHP(conf["account"])
+if bal < 11000
+  puts "Your CHP chip ballance is bellow 11,000 CHP, you don't have enuf funds to start this game, will kill pokerth now"
+  puts "Talk to Scotty (sacarlson) or one of your freinds to loan you some chips or ??"
+  # note this system call will have to be changed for windows port
+  system("killall pokerth")
+  exit -1
+end
+
   
 run_loop(log_dir,account_dir)
 

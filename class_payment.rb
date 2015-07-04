@@ -9,7 +9,7 @@ require 'rest-client'
 class Payment
 
   def initialize()
-    @data = {"method"=>"submit", "params"=>[{"secret"=>"sfwtw....", "tx_json"=>{"TransactionType"=>"Payment", "account"=>"gM4Fp...", "Destination"=>"g4eR...", "Amount"=>{"currency"=>"USD", "value"=>"0", "issuer"=>"gBAd..."}}}]}
+    @data = {"method"=>"submit", "params"=>[{"secret"=>"sfwtw....", "tx_json"=>{"TransactionType"=>"Payment", "Account"=>"gM4Fp...", "Destination"=>"g4eR...", "Amount"=>{"currency"=>"USD", "value"=>"0", "issuer"=>"gBAd..."}}}]}
     @net = {"server_url"=>"https://test.stellar.org","server_port"=>"9002"}
   end
   
@@ -82,7 +82,7 @@ class Payment
   end
 
   def set_account(account)
-    @data["params"][0]["tx_json"]["account"] = account
+    @data["params"][0]["tx_json"]["Account"] = account
   end
 
   def set_destination(dest)
@@ -91,11 +91,11 @@ class Payment
 
   def set_trust
     puts "start set_trust"
-    hash = {"method"=>"submit", "params"=>[{"secret"=>"s3wmY....", "tx_json"=>{"TransactionType"=>"TrustSet", "account"=>"gnwV....", "LimitAmount"=>{"currency"=>"CHP", "value"=>"1e+19", "issuer"=>"gBAd...."}, "Flags"=>131072}}]}
+    hash = {"method"=>"submit", "params"=>[{"secret"=>"s3wmY....", "tx_json"=>{"TransactionType"=>"TrustSet", "Account"=>"gnwV....", "LimitAmount"=>{"currency"=>"CHP", "value"=>"1e+19", "issuer"=>"gBAd...."}, "Flags"=>131072}}]}
     #puts "#{hash["params"][0]["tx_json"]["LimitAmount"]["issuer"]}"
     hash["params"][0]["tx_json"]["LimitAmount"]["issuer"] = @data["params"][0]["tx_json"]["Amount"]["issuer"]
     hash["params"][0]["secret"] = @data["params"][0]["secret"]
-    hash["params"][0]["tx_json"]["account"] = @data["params"][0]["tx_json"]["account"]
+    hash["params"][0]["tx_json"]["Account"] = @data["params"][0]["tx_json"]["Account"]
     hash["params"][0]["tx_json"]["LimitAmount"]["currency"] = @data["params"][0]["tx_json"]["Amount"]["currency"]
     #puts "#{hash}"
     return self.send_hash(hash)
@@ -103,13 +103,13 @@ class Payment
 
   def account_lines
     hash = {"method"=>"account_lines", "params"=>[{"account"=>"ghr1...."}]}
-    hash["params"][0]["account"] = @data["params"][0]["tx_json"]["account"]
+    hash["params"][0]["account"] = @data["params"][0]["tx_json"]["Account"]
     return self.send_hash(hash)
   end
 
   def check_balance
     data = '{"method":"account_info","params":[{"account":"'
-    send = data + @data["params"][0]["tx_json"]["account"] + '"}]}'
+    send = data + @data["params"][0]["tx_json"]["Account"] + '"}]}'
     url = self.server_urlport
     postdat = RestClient.post url, send
     data = JSON.parse(postdat)
@@ -191,6 +191,7 @@ end
 
 def send_native(from_issuer_pair, to_account, amount)
   stellar = Payment.new
+  puts "from account #{from_issuer_pair["account"]}"
   stellar.set_account(from_issuer_pair["account"])
   stellar.set_secret(from_issuer_pair["secret"])
   stellar.set_currency("native")
@@ -256,6 +257,27 @@ def check_bal(account)
   data = stellar.check_balance
   puts "#{data}"
   return data
+end
+
+def bal_STR(account)
+  stellar = Payment.new
+  stellar.set_account(account)
+  data = stellar.check_balance
+  puts "native ballance #{data}"
+  return data
+end
+
+def bal_CHP(account)
+  stellar = Payment.new
+  stellar.set_account(account)
+  data = stellar.account_lines
+  puts "#{data}"
+  if data["result"]["lines"] == []
+    return 0
+  else  
+    puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
+    return data["result"]["lines"][0]["balance"]
+  end
 end
 
 __END__
