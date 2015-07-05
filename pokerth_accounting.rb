@@ -615,7 +615,5 @@ if bal < 11000
   exit -1
 end
 
-exit -1 
- 
 run_loop(log_dir,account_dir)
 
