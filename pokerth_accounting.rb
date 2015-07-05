@@ -27,7 +27,7 @@ handID = 1
 
 def send_surething_player_acc(playernick,stellar_acc,urlaccountserver)
   #url = "poker.surething.biz/player_list"
-  playernick = "test25" 
+  #playernick = "test25" 
   puts "send_sure #{playernick}"
   postdata = RestClient.get urlaccountserver + "?playernick=" + playernick +"&account="+ stellar_acc
   return JSON.parse(postdata)
@@ -101,12 +101,18 @@ def get_configs(full_account_log_file, log_file)
     if exists == 0
        puts "got here not exist"
       playernick = get_playernick(log_file)
-      puts "playernick = #{playernick}"
+      puts "playernick from logs = #{playernick}"
+      if playernick.length < 1 
+         puts "playernick string length is too small we must have a problem with pokerth log file"
+         puts "make sure you have already started pokerth for some time before running pokerth_accounting.rb or at least have ran it before recently so we have logs to read"
+         exit -1
+      end
       acc_pair = create_new_account()
       config_hash["playernick"]=playernick
       config_hash["account"]=acc_pair["account"]
       config_hash["secreet"]=acc_pair["secreet"]
       config_hash["acc_pair"]=acc_pair
+      #add_CHP_trust(config_hash["stellarissuer"],acc_pair)
       db.execute "INSERT or REPLACE INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
     else
       puts "got here does exist"
@@ -157,7 +163,7 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
     exists = c[0][0]
     if exists == 0
 
-      new_pair = create_new_account_with_CHP_trust(acc_issuer_pair)
+      new_pair = create_new_account()
       
       db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
     else
@@ -556,23 +562,60 @@ def run_loop(log_dir,account_dir)
 
 end
 
+def update_surething(urlaccountserver)
+  #url = "poker.surething.biz/player_list"
+  #playernick = "test25" 
+  to_send = urlaccountserver + "/update.php" 
+  puts "#{to_send}"
+  #postdata = RestClient.get urlaccountserver + "/update.php" 
+  postdata = RestClient.get to_send
+  puts "#{postdata}"
+  #return JSON.parse(postdata)
+end
+
 log_file = find_last_log_file(log_dir)
 full_log_file = log_dir+log_file
 conf = get_configs(full_account_log_file, full_log_file)
 puts "#{conf}"
 
-
 update_players_accounts(full_account_log_file, conf["playernick"],conf["account"],conf["accountserver"])
 
-bal = bal_CHP(conf["account"])
+str = bal_STR(conf["account"])
+puts "#{str}"
+
+
+if str == "fail"
+  puts "no funds found will ask surething to send us some"
+  update_surething(conf["accountserver"])
+  str = bal_STR(conf["account"])
+  if str != fail
+    put "ok now we got STR #{str} so lets add trust and ask for some CHP from surething"
+    puts "add trust stellar issuer #{conf["stellarissuer"]} to pair #{conf["acc_pair"]}"
+    add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
+    update_surething(conf["accountserver"])
+  else
+    puts "didn't get any STR from surething so maybe try again later or ??"
+    exit -1
+  end
+end
+
+
+bal = bal_CHP(conf["account"]).to_i
+puts "CHP ballance #{bal}"
 if bal < 11000
-  puts "Your CHP chip ballance is bellow 11,000 CHP, you don't have enuf funds to start this game, will kill pokerth now"
+  puts "Your CHP chip ballance is bellow 11,000 CHP, you don't have enuf funds to start a game, we will kill pokerth now"
   puts "Talk to Scotty (sacarlson) or one of your freinds to loan you some chips or ??"
-  # note this system call will have to be changed for windows port
+  puts "You should also be able to see your CHP ballance at http://poker.surething.biz  look for your pokerth nickname"
+  puts " also we will request a donation from surething now in hopes they give you some"
+  puts "add trust stellar issuer #{conf["stellarissuer"]} to pair #{conf["acc_pair"]}"
+  add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
+  update_surething(conf["accountserver"])
+  # note this system call will have to be changed or removed for windows port
   system("killall pokerth")
   exit -1
 end
 
-  
+exit -1 
+ 
 run_loop(log_dir,account_dir)
 
