@@ -18,9 +18,9 @@ if (!$conn) {
 $playernick = htmlspecialchars($_GET["playernick"]);
 $acc = htmlspecialchars($_GET["account"]);
 
-
-
-
+if ($playernick == "notset") {
+  exit;
+}
 
 $sql = "REPLACE INTO Players (PlayerNick, AccountID,Date_Created) VALUES ('" . $playernick . "','" . $acc . "',NOW())";
 

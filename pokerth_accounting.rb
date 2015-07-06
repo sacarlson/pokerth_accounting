@@ -69,7 +69,14 @@ def playername_to_secret(playername, full_account_log_file)
 end
 
 def playername_to_accountID(playername, full_account_log_file)
-  return playername_info(playername, full_account_log_file)[3].to_s
+  info = playername_info(playername, full_account_log_file)
+  puts "info = #{info}"
+  if info.nil?
+    puts "info was nil"
+    return "notset"
+  else
+    return playername_info(playername, full_account_log_file)[3].to_s
+  end
 end
 
 
@@ -246,7 +253,7 @@ end
 
 def find_last_log_file(dir_name)
   Dir.chdir dir_name
-  filename = Dir.glob("*").max_by {|f| File.mtime(f)}
+  filename = Dir.glob("*.pdb").max_by {|f| File.mtime(f)}
   puts "last log filename = #{filename}"
   return filename
 end
@@ -373,21 +380,31 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   account_file = account_dir+"account_log.pdb"
   playername = seatnumber_to_player( seat, gamenumber, log_file)
   puts "send player #{playername} in seat #{seat}  #{amount} amount of chips"
-  update_account_log(account_file,log_file,playername,amount,gamenumber)
+  
   # to enable sending stellar set bellow if to TRUE
   if TRUE
     config = get_configs(account_file, log_file)
     send_to_accountid = playername_to_accountID(playername, account_file)
-    from_acc_accountid = config["account"]
-    from_acc_secret = config["secret"]
-    from_issuer_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
-    #send_CHP(from_issuer_pair, send_to_accountid, amount)
-    send_currency(from_issuer_pair, send_to_accountid, amount,config["currency"])
-    sleep 12
-    stellar = Payment.new
-    stellar.set_account(send_to_accountid)
-    data = stellar.account_lines
-    puts "after deposit lines #{data}"
+    if send_to_accountid != "notset"
+      bal = bal_CHP(send_to_accountid).to_i
+      if bal > 0
+        update_account_log(account_file,log_file,playername,amount,gamenumber)
+        from_acc_accountid = config["account"]
+        from_acc_secret = config["secret"]
+        from_issuer_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
+        #send_CHP(from_issuer_pair, send_to_accountid, amount)
+        send_currency(from_issuer_pair, send_to_accountid, amount,config["currency"])
+        sleep 12
+        stellar = Payment.new
+        stellar.set_account(send_to_accountid)
+        data = stellar.account_lines
+        puts "after deposit lines #{data}"
+      else
+        puts "winner #{playername} didn't have required CHP funds or lines of credit to allow payment, must have more than zero"
+      end
+    else
+      puts "player #{playername} has no Stellar account number listed so no payment sent"
+    end
   end  
 end
 #name = seatnumber_to_player(8,5,log_file)
@@ -592,7 +609,7 @@ if str == "fail"
   puts "no funds found will ask surething to send us some"
   update_surething(conf["accountserver"])
   str = bal_STR(conf["account"])
-  if str != fail
+  if str != "fail"
     put "ok now we got STR #{str} so lets add trust and ask for some CHP from surething"
     puts "add trust stellar issuer #{conf["stellarissuer"]} to pair #{conf["acc_pair"]}"
     add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
@@ -614,9 +631,14 @@ if bal < 11000
   puts "add trust stellar issuer #{conf["stellarissuer"]} to pair #{conf["acc_pair"]}"
   add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
   update_surething(conf["accountserver"])
-  # note this system call will have to be changed or removed for windows port
-  system("killall pokerth")
-  exit -1
+  sleep 15
+  bal = bal_CHP(conf["account"]).to_i
+  if bal < 11000
+    puts "still no money seen delivered from surething, might try again later or barrow some funds from a freind, will shut down pokerth and exit now"
+    # note this system call will have to be changed or removed for windows port
+    system("killall pokerth")
+    exit -1
+  end
 end
 
 run_loop(log_dir,account_dir)
