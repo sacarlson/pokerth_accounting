@@ -20,12 +20,13 @@ puts "#{pair_set}"
 from_pair = pair_set["from_pair"]
 to_pair = pair_set["to_pair"]
 
+
 to_account = to_pair["account"]
 from_account = from_pair["account"]
 
 # fill in these values with the account and amount you want to send
-amount = 50
-to_account = "gPG3YuL7fXA4BtGrW5ZgaQ3JbGsENVj2Jn"
+amount = 500000000
+to_account = "gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF"
 
 #get the ballance in STR on the to_account before we send any money
 bal_STR(to_account)

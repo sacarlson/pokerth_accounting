@@ -7,8 +7,12 @@ require './class_payment'
 # be sure to install these packages before you run this:
 # sudo apt-get install ruby-full sqlite3 ruby-sqlite3
 # gem install sys-proctable
+# gem install rest-client
+# gem install json
+# gem install sqlite3
 
 account_log_file="account_log.pdb"
+# these path will have to be changed to run it on windows
 log_dir=File.expand_path('~/.pokerth/log-files/')+"/"
 account_dir=File.expand_path('~/.pokerth/accounts/')+"/"
 Dir.mkdir(account_dir) unless File.directory?(account_dir)
