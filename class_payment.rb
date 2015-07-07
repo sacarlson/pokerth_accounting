@@ -11,6 +11,7 @@ class Payment
   def initialize()
     @data = {"method"=>"submit", "params"=>[{"secret"=>"sfwtw....", "tx_json"=>{"TransactionType"=>"Payment", "Account"=>"gM4Fp...", "Destination"=>"g4eR...", "Amount"=>{"currency"=>"USD", "value"=>"0", "issuer"=>"gBAd..."}}}]}
     @net = {"server_url"=>"https://test.stellar.org","server_port"=>"9002"}
+    @offer = {"method"=>"submit", "params"=>[{"secret"=>"s3q5Z...", "tx_json"=>{"TransactionType"=>"OfferCreate", "Account"=>"ganV...", "TakerGets"=>{"currency"=>"CHP", "value"=>"1500", "issuer"=>"ghj4..."}, "TakerPays"=>{"currency"=>"USD", "value"=>"2.5", "issuer"=>"ghj4..."}}}]}
   end
   
   def server_url
@@ -69,24 +70,48 @@ class Payment
    @data["params"][0]["tx_json"]["Amount"]["value"] = value.to_s
   end
 
+  def get_value
+    return @data["params"][0]["tx_json"]["Amount"]["value"]
+  end
+
   def set_currency(currency)    
     @data["params"][0]["tx_json"]["Amount"]["currency"] = currency
+  end
+
+  def get_currency
+    return @data["params"][0]["tx_json"]["Amount"]["currency"]
   end
 
   def set_issuer(issuer)
     @data["params"][0]["tx_json"]["Amount"]["issuer"] = issuer
   end
 
+  def get_issuer
+    return @data["params"][0]["tx_json"]["Amount"]["issuer"]
+  end
+
   def set_secret(secret)
     @data["params"][0]["secret"] = secret
+  end
+
+  def get_secret
+    return @data["params"][0]["secret"]
   end
 
   def set_account(account)
     @data["params"][0]["tx_json"]["Account"] = account
   end
 
+  def get_account
+    return @data["params"][0]["tx_json"]["Account"]
+  end
+
   def set_destination(dest)
    @data["params"][0]["tx_json"]["Destination"] = dest
+  end
+
+  def get_destination
+    return @data["params"][0]["tx_json"]["Destination"]
   end
 
   def set_trust
@@ -99,6 +124,62 @@ class Payment
     hash["params"][0]["tx_json"]["LimitAmount"]["currency"] = @data["params"][0]["tx_json"]["Amount"]["currency"]
     #puts "#{hash}"
     return self.send_hash(hash)
+  end
+
+  def book_offer
+    #{"method"=>"book_offers", "params"=>[{"taker_gets"=>{"currency"=>"STR"}, "taker_pays"=>{"issuer"=>"gnhP...", "currency"=>"BTC"}}]}
+    hash = {"method"=>"book_offers", "params"=>[{"taker_gets"=>{"issuer"=>"gnhP...", "currency"=>"CHP"}, "taker_pays"=>{"issuer"=>"gnhP...", "currency"=>"USD"}}]}
+    hash["params"][0]["taker_pays"]["issuer"] = self.get_takerpays["issuer"]
+    hash["params"][0]["taker_pays"]["currency"] = self.get_takerpays["currency"]
+    hash["params"][0]["taker_gets"]["issuer"] = self.get_takergets["issuer"]
+    hash["params"][0]["taker_gets"]["currency"] = self.get_takergets["currency"]
+    return self.send_hash(hash)
+  end
+
+  def static_path_find
+    hash = {"method"=>"static_path_find", "params"=>[{"source_account"=>"ganV...", "destination_account"=>"gBV8...", "destination_amount"=>{"currency"=>"USD", "value"=>"0", "issuer"=>"gBV8..."}}]}
+    hash["params"][0]["source_account"] = @data["params"][0]["tx_json"]["Account"]
+    hash["params"][0]["destination_account"] = @data["params"][0]["tx_json"]["Destination"]
+    hash["params"][0]["destination_amount"]["currency"] = @data["params"][0]["tx_json"]["Amount"]["currency"]
+    hash["params"][0]["destination_amount"]["value"] = @data["params"][0]["tx_json"]["Amount"]["value"]
+    hash["params"][0]["destination_amount"]["issuer"] = @data["params"][0]["tx_json"]["Amount"]["issuer"]
+    return self.send_hash(hash)
+  end
+
+  def offer_cancel(offersequence)
+    hash = {"method"=>"submit", "params"=>[{"secret"=>"s3q5...", "tx_json"=>{"TransactionType"=>"OfferCancel", "Account"=>"ganV...", "OfferSequence"=>"0"}}]}
+    hash["params"][0]["secret"] = @data["params"][0]["secret"]
+    hash["params"][0]["tx_json"]["Account"] = @data["params"][0]["tx_json"]["Account"]    
+    hash["params"][0]["tx_json"][0]["OfferSequence"] = offersequence.to_s
+    return self.send_hash(hash)
+  end
+  
+  def offer_create
+    #@offer = {"method"=>"submit", "params"=>[{"secret"=>"s3q5Z...", "tx_json"=>{"TransactionType"=>"OfferCreate", "Account"=>"ganV...", "TakerGets"=>{"currency"=>"USD", "value"=>"1500", "issuer"=>"ghj4..."}, "TakerPays"=>{"currency"=>"BTC", "value"=>"2.5", "issuer"=>"ghj4..."}}}]}
+    @offer["params"][0]["tx_json"]["Account"] = @data["params"][0]["tx_json"]["Account"]
+    @offer["params"][0]["secret"] = @data["params"][0]["secret"]
+    return self.send_hash(@offer)
+  end
+   
+  def set_takerpays(currency,value,issuer)
+    #@offer = {"method"=>"submit", "params"=>[{"secret"=>"s3q5Z...", "tx_json"=>{"TransactionType"=>"OfferCreate", "Account"=>"ganV...", "TakerGets"=>{"currency"=>"CHP", "value"=>"1500", "issuer"=>"ghj4..."}, "TakerPays"=>{"currency"=>"USD", "value"=>"2.5", "issuer"=>"ghj4..."}}}]}
+    @offer["params"][0]["tx_json"]["TakerPays"]["value"] = value.to_s
+    @offer["params"][0]["tx_json"]["TakerPays"]["issuer"] = issuer
+    @offer["params"][0]["tx_json"]["TakerPays"]["currency"] = currency 
+  end
+
+  def get_takerpays
+    return @offer["params"][0]["tx_json"]["TakerPays"]
+  end
+
+  def set_takergets(currency,value,issuer)
+    @offer["params"][0]["tx_json"]["TakerGets"]["value"] = value.to_s
+    @offer["params"][0]["tx_json"]["TakerGets"]["issuer"] = issuer
+    @offer["params"][0]["tx_json"]["TakerGets"]["currency"] = currency 
+  end
+
+  def get_takergets
+    return @offer["params"][0]["tx_json"]["TakerGets"]
   end
 
   def account_lines
@@ -149,6 +230,7 @@ class Payment
     return data    
   end   
 end
+#end class Payment ..................................
 
 def create_new_account()
   new_pair = {"account"=>"ghr1b....", "secret"=>"s3x6v....."}
