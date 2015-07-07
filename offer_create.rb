@@ -29,9 +29,21 @@ from_account = from_pair["account"]
   results = stellar.offer_create
   puts "#{results}"
   sleep 14
+  puts ""
+  puts ""
   results = stellar.book_offer
   puts "#{results}"
   stellar.set_takerpays("USD",0,issuer_account)
   stellar.set_takergets("EUR",0,issuer_account)
+  puts ""
+  puts ""
   results = stellar.book_offer
+  puts "#{results}"
+  
+  #gBuY... is meetreks users account we will play with here
+  stellar.set_destination("gBuYT5AQpjw1mEiDBJNJshtV3GyV5A2UKA")
+  stellar.set_issuer(issuer_account)
+  stellar.set_currency("USD")
+  stellar.set_value(1)
+  results = stellar.static_path_find
   puts "#{results}"

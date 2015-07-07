@@ -104,6 +104,10 @@ def get_configs(full_account_log_file, log_file)
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
         PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT)"
+    db.execute "CREATE TABLE IF NOT EXISTS Players(Id INTEGER PRIMARY KEY, 
+        Name TEXT UNIQUE, Ballance INT, AccountID TEXT, master_seed TEXT, AccBal INT, AccBalLast INT, AccDiff INT)"
+    db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
+        Name TEXT, Amount INT, GameID INT, Log_file TEXT, AccountID TEXT, Time TEXT)"
     
     c = db.execute( "SELECT count(*) FROM Configs ")
    
@@ -113,8 +117,8 @@ def get_configs(full_account_log_file, log_file)
        puts "got here not exist"
       playernick = get_playernick(log_file)
       puts "playernick from logs = #{playernick}"
-      if playernick.length < 1 
-         puts "playernick string length is too small we must have a problem with pokerth log file"
+      if playernick.nil? 
+         puts "playernick return nil we must have a problem with pokerth log file"
          puts "make sure you have already started pokerth for some time before running pokerth_accounting.rb or at least have ran it before recently so we have logs to read"
          exit -1
       end
@@ -124,6 +128,7 @@ def get_configs(full_account_log_file, log_file)
       config_hash["secreet"]=acc_pair["secreet"]
       config_hash["acc_pair"]=acc_pair
       #add_CHP_trust(config_hash["stellarissuer"],acc_pair)
+      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent',NULL,NULL,NULL,NULL, NULL,NULL)"
       db.execute "INSERT or REPLACE INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
     else
       puts "got here does exist"
@@ -173,7 +178,8 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
     #puts "c = #{c[0][0]}"
     exists = c[0][0]
     if exists == 0
-
+      # this account is only used in test if you want to autocreate accounts for everyone that you are playing with
+      # it would have to be funded with STR and CHP if it was to be used. by default this is not used in the standard game mode any more
       new_pair = create_new_account()
       
       db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
@@ -606,11 +612,11 @@ puts "#{str}"
 
 
 if str == "fail"
-  puts "no funds found will ask surething to send us some"
+  puts "no funds found will ask surething to send us some (this will take up to 30 secounds so please wait)"
   update_surething(conf["accountserver"])
   str = bal_STR(conf["account"])
   if str != "fail"
-    put "ok now we got STR #{str} so lets add trust and ask for some CHP from surething"
+    puts "ok now we got STR #{str} so lets add trust and ask for some CHP from surething"
     puts "add trust stellar issuer #{conf["stellarissuer"]} to pair #{conf["acc_pair"]}"
     add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
     update_surething(conf["accountserver"])
