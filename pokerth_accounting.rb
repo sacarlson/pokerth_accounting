@@ -666,12 +666,12 @@ def cash_left(log_file,gamenumber,handID)
   end
   return 0
 end
-handID = 18
-gamenumber = 1
-result = cash_left(log_file,gamenumber,handID)
-puts "#{result}"
+#handID = 18
+#gamenumber = 1
+#result = cash_left(log_file,gamenumber,handID)
+#puts "#{result}"
 
-exit -1
+#exit -1
 
 log_file = find_last_log_file(log_dir)
 full_log_file = log_dir+log_file
