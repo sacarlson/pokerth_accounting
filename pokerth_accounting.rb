@@ -431,12 +431,16 @@ end
 puts "log_file = #{log_file}"
 puts "handID = #{handID}"
 winner_seat = we_have_game_winner(log_file, gamenumber).to_i
-if winner_seat > 0  
+if winner_seat > 1  
   amount = cash_left(log_file,gamenumber,handID).to_i
   puts "winner detected, send him last of your money #{amount}"
   if amount > 0
     send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
   end
+  return
+end
+if winner_seat == 1
+  puts "congradulations your the winner, no more money to be sent for this game"
   return
 end
 seat_diff = [0,0,0,0,0,0,0,0,0,0]
