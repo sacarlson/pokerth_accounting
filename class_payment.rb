@@ -9,7 +9,7 @@ require 'rest-client'
 class Payment
 
   def initialize()
-    @data = {"method"=>"submit", "params"=>[{"secret"=>"sfwtw....", "tx_json"=>{"TransactionType"=>"Payment", "Account"=>"gM4Fp...", "Destination"=>"g4eR...", "Amount"=>{"currency"=>"USD", "value"=>"0", "issuer"=>"gBAd..."}}}]}
+    @data = {"method"=>"submit", "params"=>[{"secret"=>"sfwtw....", "tx_json"=>{"TransactionType"=>"Payment", "Account"=>"gM4Fp...","DestinationTag"=>"31415", "Destination"=>"g4eR...", "Amount"=>{"currency"=>"USD", "value"=>"0", "issuer"=>"gBAd..."}}}]}
     @net = {"server_url"=>"https://test.stellar.org","server_port"=>"9002"}
     @offer = {"method"=>"submit", "params"=>[{"secret"=>"s3q5Z...", "tx_json"=>{"TransactionType"=>"OfferCreate", "Account"=>"ganV...", "TakerGets"=>{"currency"=>"CHP", "value"=>"1500", "issuer"=>"ghj4..."}, "TakerPays"=>{"currency"=>"USD", "value"=>"2.5", "issuer"=>"ghj4..."}}}]}
   end
@@ -67,7 +67,16 @@ class Payment
   end  
 
   def set_value(value)
-   @data["params"][0]["tx_json"]["Amount"]["value"] = value.to_s
+    @data["params"][0]["tx_json"]["Amount"]["value"] = value.to_s
+  end
+
+  def set_DestinationTag(tag)
+    # tag must be int    
+    @data["params"][0]["tx_json"]["DestinationTag"] = tag.to_i.to_s
+  end
+
+  def get_DestinationTag
+    return @data["params"][0]["tx_json"]["DestinationTag"]
   end
 
   def get_value
@@ -107,7 +116,7 @@ class Payment
   end
 
   def set_destination(dest)
-   @data["params"][0]["tx_json"]["Destination"] = dest
+    @data["params"][0]["tx_json"]["Destination"] = dest
   end
 
   def get_destination
@@ -211,6 +220,10 @@ class Payment
     return @data.to_json    
   end
 
+  def send_currency
+    return self.send
+  end
+
   def send
     data = self.to_json
     url = self.server_urlport
@@ -279,8 +292,9 @@ def send_native(from_issuer_pair, to_account, amount)
   stellar.set_currency("native")
   #stellar.set_issuer(from_issuer_pair["account"])
   stellar.set_value(amount)
+  #stellar.set_DestinationTag(124)
   stellar.set_destination(to_account)
-  status = stellar.send
+  status = stellar.send_currency
   #puts "status = #{status}"
   return status
 end
@@ -303,16 +317,16 @@ def add_trust(issuer_account,to_pair,currency)
 end
 
 
-def send_currency(from_issuer_pair, to_account, amount,currency)
+def send_currency(from_account_pair, to_account,issuer_account, amount,currency)
   # pairs {"account"=>"gj5D....","secret"=>"s3x6v...."}
   stellar = Payment.new
-  stellar.set_account(from_issuer_pair["account"])
-  stellar.set_secret(from_issuer_pair["secret"])
+  stellar.set_account(from_account_pair["account"])
+  stellar.set_secret(from_account_pair["secret"])
   stellar.set_currency(currency)
-  stellar.set_issuer(from_issuer_pair["account"])
+  stellar.set_issuer(issuer_account)
   stellar.set_value(amount)
   stellar.set_destination(to_account)
-  status = stellar.send
+  status = stellar.send_currency
   #puts "status = #{status}"
   return status
 end
@@ -335,7 +349,9 @@ def check_bal(account)
   stellar.set_account(account)
   data = stellar.account_lines
   puts "#{data}"
-  puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
+  puts ""
+  puts ""
+  #puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
   data = stellar.check_balance
   puts "#{data}"
   return data
@@ -381,7 +397,7 @@ stellar.set_account("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
 data = stellar.check_balance
 puts "#{data}"
 
-puts "#{stellar.send}"
+puts "#{stellar.send_currency}"
 
 sleep 10
 puts "#{stellar.check_balance}"

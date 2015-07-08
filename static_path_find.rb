@@ -15,3 +15,7 @@ require './class_payment'
   stellar.set_value(1)
   results = stellar.static_path_find
   puts "#{results}"
+  puts " "
+  stellar.set_currency("EUR")
+  results = stellar.static_path_find
+  puts "#{results}"

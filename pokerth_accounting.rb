@@ -20,11 +20,11 @@ full_account_log_file=account_dir+account_log_file
 
 
 # these values were just for function test setup only
-log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-06-30_143148.pdb"
+log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-08_090423.pdb"
 playername="sacarlson2"
 amount=100
 start_cash=10000
-gamenumber=7
+gamenumber=1
 win_count=0
 handID = 1
 
@@ -140,8 +140,8 @@ def get_configs(full_account_log_file, log_file)
         config_hash["new"]=FALSE
         config_hash["playernick"]=row[1]
         config_hash["account"]=row[2]
-        config_hash["secreet"]=row[3]
-        config_hash["acc_pair"]={"account"=>row[2], "secret"=>row[3]} 
+        config_hash["secret"]=row[3]
+        config_hash["account_pair"]={"account"=>row[2], "secret"=>row[3]} 
         config_hash["currency"]=row[4]  
         config_hash["paymenturl"]=row[5]
         config_hash["stellarissuer"]=row[6]
@@ -397,9 +397,13 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
         update_account_log(account_file,log_file,playername,amount,gamenumber)
         from_acc_accountid = config["account"]
         from_acc_secret = config["secret"]
-        from_issuer_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
+        from_account_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
+        puts "#{from_account_pair}"
         #send_CHP(from_issuer_pair, send_to_accountid, amount)
-        send_currency(from_issuer_pair, send_to_accountid, amount,config["currency"])
+        #result = send_currency(from_issuer_pair, send_to_accountid, amount,config["currency"])
+        puts "issuer #{config["stellarissuer"]}"
+        result = send_currency(from_account_pair, send_to_accountid, config["stellarissuer"], amount, config["currency"])
+        puts "#{result}"
         sleep 12
         stellar = Payment.new
         stellar.set_account(send_to_accountid)
@@ -425,6 +429,16 @@ if handID <= 0
   return 
 end
 puts "log_file = #{log_file}"
+puts "handID = #{handID}"
+winner_seat = we_have_game_winner(log_file, gamenumber).to_i
+if winner_seat > 0  
+  amount = cash_left(log_file,gamenumber,handID).to_i
+  puts "winner detected, send him last of your money #{amount}"
+  if amount > 0
+    send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
+  end
+  return
+end
 seat_diff = [0,0,0,0,0,0,0,0,0,0]
 winner = [FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE]
 last_winner_seat = 0
@@ -561,6 +575,10 @@ def run_loop(log_dir,account_dir)
     if newgamenumber != gamenumber 
       break
     end
+    if proc_exists("pokerth") == FALSE
+      puts "pokerth is not detected as running will exit now, you must run pokerth before pokerth_accounting.rb"
+      exit -1
+    end
     sleep(5)
   end
   puts "new game started"  
@@ -600,19 +618,71 @@ def update_surething(urlaccountserver)
   #return JSON.parse(postdata)
 end
 
+def we_have_game_winner(log_file, gamenumber)
+  # we have game winner will return 0 if no winner of the game yet,  will return seat of the winner if final winner of this game has won
+  begin
+    db = SQLite3::Database.open log_file
+    db.execute "PRAGMA journal_mode = WAL"
+    stm = db.prepare "SELECT * FROM Action WHERE UniqueGameID=#{gamenumber} AND Action='wins game' LIMIT 2" 
+    rs = stm.execute
+    rs.each do |row|
+      #puts "row = #{row}"
+      #puts "row 4 = #{row[4]}"
+      return row[4]
+    end
+  rescue SQLite3::Exception => e 
+    
+    puts "Exception occurred"
+    puts e
+    
+  ensure
+    stm.close if stm
+    db.close if db
+  end
+  return 0
+end
+#result = we_have_winner(log_file, gamenumber)
+#puts "#{result}"
+
+def cash_left(log_file,gamenumber,handID)
+   begin
+    db = SQLite3::Database.open log_file
+    db.execute "PRAGMA journal_mode = WAL"
+    stm = db.prepare "SELECT * FROM Hand WHERE UniqueGameID=#{gamenumber} AND HandID=#{handID} LIMIT 2" 
+    rs = stm.execute
+    rs.each do |row|
+      #puts "row = #{row}"
+      #puts "row 7 = #{row[7]}"
+      return row[4]
+    end
+  rescue SQLite3::Exception => e 
+    
+    puts "Exception occurred"
+    puts e
+    
+  ensure
+    stm.close if stm
+    db.close if db
+  end
+  return 0
+end
+#handID = 19
+#result = cash_left(log_file,gamenumber,handID)
+#puts "#{result}"
+
+#exit -1
+
 log_file = find_last_log_file(log_dir)
 full_log_file = log_dir+log_file
 conf = get_configs(full_account_log_file, full_log_file)
 puts "#{conf}"
-
-update_players_accounts(full_account_log_file, conf["playernick"],conf["account"],conf["accountserver"])
 
 str = bal_STR(conf["account"])
 puts "#{str}"
 
 
 if str == "fail"
-  puts "no funds found will ask surething to send us some (this will take up to 30 secounds so please wait)"
+  puts "no STR funds in your account found, we will ask surething to send us some (this will take up to 30 secounds so please wait)"
   update_surething(conf["accountserver"])
   str = bal_STR(conf["account"])
   if str != "fail"
@@ -621,11 +691,11 @@ if str == "fail"
     add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
     update_surething(conf["accountserver"])
   else
-    puts "didn't get any STR from surething so maybe try again later or ??"
+    puts "didn't get any STR from surething so maybe try again later or ??, will exit now and kill pokerth"
+    system("killall pokerth")
     exit -1
   end
 end
-
 
 bal = bal_CHP(conf["account"]).to_i
 puts "CHP ballance #{bal}"
@@ -646,6 +716,8 @@ if bal < 11000
     exit -1
   end
 end
+
+update_players_accounts(full_account_log_file, conf["playernick"],conf["account"],conf["accountserver"])
 
 run_loop(log_dir,account_dir)
 
