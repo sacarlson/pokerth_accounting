@@ -20,7 +20,7 @@ full_account_log_file=account_dir+account_log_file
 
 
 # these values were just for function test setup only
-log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-08_090423.pdb"
+log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-09_001925.pdb"
 playername="sacarlson2"
 amount=100
 start_cash=10000
@@ -653,7 +653,7 @@ def cash_left(log_file,gamenumber,handID)
     rs.each do |row|
       #puts "row = #{row}"
       #puts "row 7 = #{row[7]}"
-      return row[4]
+      return row[7]
     end
   rescue SQLite3::Exception => e 
     
@@ -666,11 +666,12 @@ def cash_left(log_file,gamenumber,handID)
   end
   return 0
 end
-#handID = 19
-#result = cash_left(log_file,gamenumber,handID)
-#puts "#{result}"
+handID = 18
+gamenumber = 1
+result = cash_left(log_file,gamenumber,handID)
+puts "#{result}"
 
-#exit -1
+exit -1
 
 log_file = find_last_log_file(log_dir)
 full_log_file = log_dir+log_file
