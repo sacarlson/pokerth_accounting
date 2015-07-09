@@ -23,7 +23,7 @@ full_account_log_file=account_dir+account_log_file
 log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-09_001925.pdb"
 playername="sacarlson2"
 amount=100
-start_cash=10000
+start_cash=1000
 gamenumber=1
 win_count=0
 handID = 1
@@ -387,7 +387,7 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   playername = seatnumber_to_player( seat, gamenumber, log_file)
   puts "send player #{playername} in seat #{seat}  #{amount} amount of chips"
   
-  # to enable sending stellar set bellow if to TRUE
+  # to enable sending stellar set bellow if to TRUE, this is for testing only
   if TRUE
     config = get_configs(account_file, log_file)
     send_to_accountid = playername_to_accountID(playername, account_file)
@@ -422,6 +422,121 @@ end
 #send_player_chips(8,100,5,log_file)
 #exit -1
 
+
+def get_players_cash_holdings(log_file, gamenumber, handID, start_cash)
+  #return an hash with each players cash holdings at this point in gamenumber, handID with this start_cash. the players are id by seat number in hash string
+  hash = {"1"=>start_cash, "2"=>start_cash, "3"=>start_cash, "4"=>start_cash, "5"=>start_cash, "6"=>start_cash, "7"=>start_cash, "8"=>start_cash, "9"=>start_cash, "10"=>start_cash}
+  if handID < 1
+    return hash
+  end 
+  db = SQLite3::Database.open log_file
+    db.execute "PRAGMA journal_mode = WAL"
+    db.results_as_hash = true
+    stm = db.prepare "SELECT * FROM Hand WHERE UniqueGameID=#{gamenumber} AND HandID = #{handID} LIMIT 2"    
+    rs = stm.execute
+    rs.each do |row|
+      #puts "#{row}"
+      hash["1"] = row['Seat_1_Cash'].to_i
+      hash["2"] = row['Seat_2_Cash'].to_i 
+      hash["3"] = row['Seat_3_Cash'].to_i
+      hash["4"] = row['Seat_4_Cash'].to_i
+      hash["5"] = row['Seat_5_Cash'].to_i
+      hash["6"] = row['Seat_6_Cash'].to_i
+      hash["7"] = row['Seat_7_Cash'].to_i
+      hash["8"] = row['Seat_8_Cash'].to_i
+      hash["9"] = row['Seat_9_Cash'].to_i
+      hash["10"] = row['Seat_10_Cash'].to_i
+    end
+    return hash 
+end
+
+#result = get_players_cash_holdings(log_file, gamenumber, handID, start_cash)
+#puts "#{result}"
+#exit -1
+
+def get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
+  # this will return a hash of each player number with the change in cash from the last hand
+  hash = {"1"=>0, "2"=>0, "3"=>0, "4"=>0, "5"=>0, "6"=>0, "7"=>0, "8"=>0, "9"=>0, "10"=>0}
+  if handID <= 1
+    return hash
+  end
+  present = get_players_cash_holdings(log_file, gamenumber, handID, start_cash)
+  #puts "present #{present}"
+  last = get_players_cash_holdings(log_file, gamenumber, handID - 1, start_cash)
+  #puts "last #{last}"
+  present.each do |x|
+    #puts "#{x}"
+    #puts "#{x[0]} #{last[x[0]]}"
+    z = x[1] - last[x[0]]
+    #puts "z = #{z}"
+    hash[x[0]] = z
+  end
+  return hash
+end
+
+#result = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
+#puts "diff #{result}"
+#exit -1
+
+def count_winners(log_file, gamenumber, handID, start_cash)
+  #return the number of winners in this hand not counting you, if you win return is 0
+  change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
+  if change["1"] >= 0
+    return 0
+  end
+  count = 0
+  change.each do |x|
+    #puts "#{x}"
+    if x[1] > 0
+      count = count + 1
+    end
+  end
+  return count
+end
+
+#result = count_winners(log_file, gamenumber, handID, start_cash)
+#puts "#{result}"
+#exit -1
+
+def send_winning_hands_chips(log_file, gamenumber, handID, start_cash,account_dir)
+  # this is a new version of send_winner_hand_chips to make it easier to read and work from first hand instead of delayed
+  # this will detect if there are any winners in this handID, and will setup to pay each of them what you owe them
+  # I would also like to add to this at some point to keep track of what other players have lost to you and store a record of its total
+  winner_seat = we_have_game_winner(log_file, gamenumber).to_i
+  if winner_seat == 1
+    puts "congradulations your the winner, no more money to be sent for this game"
+    return
+  end
+  if winner_seat > 1  
+    amount = cash_left(log_file,gamenumber,handID).to_i
+    puts "winner detected, send him last of your money #{amount}"
+    if amount > 0
+      send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
+    end
+    return
+  end
+  
+  win_count = count_winners(log_file, gamenumber, handID, start_cash)
+  if win_count == 0
+    return
+  end 
+  change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
+  change.each do |x|
+    #puts "#{x}"
+    if x[1] > 0
+      #puts "#{x}"
+      amount = x[1]/win_count
+      winner_seat = x[0]
+      send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
+    end
+  end
+  return
+end
+
+#handID = 3
+#result = send_winning_hands_chips(log_file, gamenumber, handID, start_cash,account_dir)
+#puts "#{result}"
+#exit -1
 
 def send_winner_hand_chips(log_file, gamenumber, handID, start_cash,account_dir)
 if handID <= 0 
@@ -595,7 +710,8 @@ def run_loop(log_dir,account_dir)
     if newmaxhand != maxhand
       # do check
       puts "change detected"
-      send_winner_hand_chips(log_file, gamenumber, newmaxhand, start_cash,account_dir)
+      #send_winner_hand_chips(log_file, gamenumber, newmaxhand, start_cash,account_dir)
+      send_winning_hands_chips(log_file, gamenumber, newmaxhand, start_cash,account_dir)
       maxhand = newmaxhand
     end
     newgamenumber = find_max_game( log_file)
