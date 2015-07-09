@@ -4,12 +4,21 @@ require 'sys/proctable'
 include Sys
 require 'sqlite3'
 require './class_payment'
+
 # be sure to install these packages before you run this:
 # sudo apt-get install ruby-full sqlite3 ruby-sqlite3
 # gem install sys-proctable
 # gem install rest-client
 # gem install json
 # gem install sqlite3
+
+# windows only (planed but not used yet)
+#gem install win32-sound
+
+#Sound.play('chimes.wav')
+#Sound.play('c:\sounds\hal9000.wav')
+#Sound.beep(5000, 3000)
+
 
 account_log_file="account_log.pdb"
 # these path will have to be changed to run it on windows
@@ -28,6 +37,15 @@ gamenumber=1
 win_count=0
 handID = 1
 
+# presently disabled voice just runs on my computer but later will add to all if you want
+# this tells what is being sent to who and tells when you get a deposit delivered from winnings.
+# not sure if it will ever work on windows.  I'll add beeps for them or wav sounds
+def say(string)
+#  command = "/home/sacarlson/github/poker_accounting/say.sh "+ "'" + string + "'"
+#  system(command)
+end
+
+say("poker accounting has started")
 
 def send_surething_player_acc(playernick,stellar_acc,urlaccountserver)
   #url = "poker.surething.biz/player_list"
@@ -46,8 +64,9 @@ def update_players_accounts(full_account_log_file, playernick, stellar_acc,accou
     #puts "row = #{row}"
     #puts "#{row[1] +"  " + row[2]}"
     playername = row[1]
-    stellar_acc = row[2]
-    db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}',NULL,'#{stellar_acc}',NULL,NULL, NULL,NULL)"
+    stellar_acc = row[2]    
+    #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}',NULL,'#{stellar_acc}',NULL,NULL, NULL,NULL)"
+    db.execute "INSERT or IGNORE INTO Players VALUES(NULL,'#{playername}',NULL,'#{stellar_acc}',NULL,NULL, NULL,NULL)"
   end
   db.close if db
 end
@@ -128,8 +147,10 @@ def get_configs(full_account_log_file, log_file)
       config_hash["secreet"]=acc_pair["secreet"]
       config_hash["acc_pair"]=acc_pair
       #add_CHP_trust(config_hash["stellarissuer"],acc_pair)
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent',NULL,NULL,NULL,NULL, NULL,NULL)"
-      db.execute "INSERT or REPLACE INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
+      #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent',NULL,NULL,NULL,NULL, NULL,NULL)"
+      #db.execute "INSERT or REPLACE INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
+      db.execute "INSERT INTO Players VALUES(NULL,'Total_sent',NULL,NULL,NULL,NULL, NULL,NULL)"
+      db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
     else
       puts "got here does exist"
       db.execute "PRAGMA journal_mode = WAL"
@@ -182,7 +203,8 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
       # it would have to be funded with STR and CHP if it was to be used. by default this is not used in the standard game mode any more
       new_pair = create_new_account()
       
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
+      #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
+      db.execute "INSERT INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = 'Total_sent'"
     end
@@ -196,7 +218,8 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
       acc_issuer_pair = {"account"=>acc_issuer_account, "secret"=>acc_issuer_secret}
       new_pair = create_new_account_with_CHP_trust(acc_issuer_pair)
       puts "new_pair = #{new_pair}"
-      db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
+      #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
+      db.execute "INSERT INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
     else
       db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'"
     end
@@ -386,7 +409,8 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   account_file = account_dir+"account_log.pdb"
   playername = seatnumber_to_player( seat, gamenumber, log_file)
   puts "send player #{playername} in seat #{seat}  #{amount} amount of chips"
-  
+  saystring = "sending player #{playername}   #{amount}  chips"
+  say(saystring)
   # to enable sending stellar set bellow if to TRUE, this is for testing only
   if TRUE
     config = get_configs(account_file, log_file)
@@ -456,6 +480,7 @@ end
 
 def get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
   # this will return a hash of each player number with the change in cash from the last hand
+  #say("hand number #{handID}")
   hash = {"1"=>0, "2"=>0, "3"=>0, "4"=>0, "5"=>0, "6"=>0, "7"=>0, "8"=>0, "9"=>0, "10"=>0}
   if handID <= 1
     return hash
@@ -502,17 +527,22 @@ def send_winning_hands_chips(log_file, gamenumber, handID, start_cash,account_di
   # this is a new version of send_winner_hand_chips to make it easier to read and work from first hand instead of delayed
   # this will detect if there are any winners in this handID, and will setup to pay each of them what you owe them
   # I would also like to add to this at some point to keep track of what other players have lost to you and store a record of its total
+  say("hand i d #{handID} in send winnings")
   winner_seat = we_have_game_winner(log_file, gamenumber).to_i
   if winner_seat == 1
     puts "congradulations your the winner, no more money to be sent for this game"
+    say("congradulations your the winner of this game, we will now exit poker accounting")
+    exit -1
     return
   end
   if winner_seat > 1  
     amount = cash_left(log_file,gamenumber,handID).to_i
     puts "winner detected, send him last of your money #{amount}"
+    say("you have lost this game, we will send last of your funds #{amount} to the winner and exit accounting")
     if amount > 0
       send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
     end
+    exit -1
     return
   end
   
@@ -538,142 +568,7 @@ end
 #puts "#{result}"
 #exit -1
 
-def send_winner_hand_chips(log_file, gamenumber, handID, start_cash,account_dir)
-if handID <= 0 
-  puts "handID is zero or less exiting send_winner... "
-  return 
-end
-puts "log_file = #{log_file}"
-puts "handID = #{handID}"
-winner_seat = we_have_game_winner(log_file, gamenumber).to_i
-if winner_seat > 1  
-  amount = cash_left(log_file,gamenumber,handID).to_i
-  puts "winner detected, send him last of your money #{amount}"
-  if amount > 0
-    send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
-  end
-  return
-end
-if winner_seat == 1
-  puts "congradulations your the winner, no more money to be sent for this game"
-  return
-end
-seat_diff = [0,0,0,0,0,0,0,0,0,0]
-winner = [FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE]
-last_winner_seat = 0
-last_winner_send = 0
-begin
-    
-    db = SQLite3::Database.open log_file
-    db.execute "PRAGMA journal_mode = WAL"
-    db.results_as_hash = true
-    if handID == 1
-      starthand = handID
-    else 
-      starthand = handID - 1
-    end
-    puts "starthand = #{starthand}"
-    stm = db.prepare "SELECT * FROM Hand WHERE UniqueGameID=#{gamenumber} AND HandID >= #{starthand} LIMIT 2" 
-    
-    rs = stm.execute 
-    
-    seat_1_cash_last=start_cash
-    seat_2_cash_last=start_cash
-    seat_3_cash_last=start_cash
-    seat_4_cash_last=start_cash
-    seat_5_cash_last=start_cash
-    seat_6_cash_last=start_cash
-    seat_7_cash_last=start_cash
-    seat_8_cash_last=start_cash
-    seat_9_cash_last=start_cash
-    seat_10_cash_last=start_cash
-    total_loss_seat_1=0
-    not_first_row = FALSE
-    rs.each do |row|
-        total_loss_seat_1 = row['Seat_1_Cash'].to_i - start_cash
-            
-        seat_diff[1] = row['Seat_1_Cash'].to_i - seat_1_cash_last
-        seat_diff[2] = row['Seat_2_Cash'].to_i - seat_2_cash_last
-        seat_diff[3] = row['Seat_3_Cash'].to_i - seat_3_cash_last
-        seat_diff[4] = row['Seat_4_Cash'].to_i - seat_4_cash_last
-        seat_diff[5] = row['Seat_5_Cash'].to_i - seat_5_cash_last
-        seat_diff[6] = row['Seat_6_Cash'].to_i - seat_6_cash_last
-        seat_diff[7] = row['Seat_7_Cash'].to_i - seat_7_cash_last
-        seat_diff[8] = row['Seat_8_Cash'].to_i - seat_8_cash_last
-        seat_diff[9] = row['Seat_9_Cash'].to_i - seat_9_cash_last
-        seat_diff[10] = row['Seat_10_Cash'].to_i - seat_10_cash_last
-        win_count=0
-        puts "seat_diff[1] = #{seat_diff[1].to_i}"
-        puts "handID = #{handID}  not_first_row = #{not_first_row}"
-        #puts "(not_first_row || handID == 1) = #{(not_first_row || handID == 1)}"
-       
-        if (seat_diff[1].to_i < 0) && (not_first_row || handID == 1)
-          
-          #puts "here" 
-          #puts "seat_diff #{seat_diff}"
-          seat=0
-          winner = [FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE]
-          total_pot_winnings = 0
-          seat_diff.each do |x|
-            
-            #puts "seat_diff[#{seat}] = #{seat_diff[seat]}"
-            if x > 0
-              winner[seat]=TRUE
-              win_count += 1
-              total_pot_winnings = total_pot_winnings + x
-              #puts "here win_count #{win_count}  winner seat #{seat} wins #{x} chips"
-            end
-            seat += 1
-          end
-          puts "win_count = #{win_count}"
-          seat=0
-          winner.each do |win|        
-            #puts "seat = #{seat}"
-            if win == TRUE
-              multiple_of_pot = seat_diff[seat].to_f / total_pot_winnings.to_f
-              send_chip_ammount = seat_diff[1].to_f * multiple_of_pot.to_f * -1
-              puts "multiple_of_pot = #{multiple_of_pot}"
-              #puts "send seat #{seat}  #{seat_diff[1]/win_count} chips"
-              winners_seat = seat
-              #last_winner_send = seat_diff[1]/win_count
-              send_player_chips( winners_seat, send_chip_ammount, gamenumber, log_file,account_dir)
-              #return TRUE
-            end
-            seat +=1
-          end
-        end
-       not_first_row = TRUE
-       # puts "seat_1_cash_last = #{seat_1_cash_last.to_i}"
-       # puts "seat_1_Cash =  #{row['Seat_1_Cash'].to_i} "
-       # puts " seat_diff[1]= #{seat_diff[1]}"        
-       # puts " total_loss_seat_1 = #{total_loss_seat_1}"
 
-        seat_1_cash_last=row['Seat_1_Cash'].to_i
-        seat_2_cash_last=row['Seat_2_Cash'].to_i
-        seat_3_cash_last=row['Seat_3_Cash'].to_i
-        seat_4_cash_last=row['Seat_4_Cash'].to_i
-        seat_5_cash_last=row['Seat_5_Cash'].to_i
-        seat_6_cash_last=row['Seat_6_Cash'].to_i
-        seat_7_cash_last=row['Seat_7_Cash'].to_i
-        seat_8_cash_last=row['Seat_8_Cash'].to_i
-        seat_9_cash_last=row['Seat_9_Cash'].to_i
-        seat_10_cash_last=row['Seat_10_Cash'].to_i
-        puts " seat_1_cash_last = #{seat_1_cash_last}"
-    end
-           
-rescue SQLite3::Exception => e     
-    puts "Exception occurred"
-    puts e    
-ensure
-    stm.close if stm
-    db.close if db
-end
-  puts "exit send_winner..."
-  #return FALSE
-end  #end function 
-
-#send_winner_hand_chips(log_file, gamenumber, handID, start_cash, account_dir)
-#exit -1
 
 def run_loop(log_dir,account_dir)
   log_file = find_last_log_file(log_dir)
@@ -685,6 +580,8 @@ def run_loop(log_dir,account_dir)
   #puts "start_cash = #{start_cash}"
   maxhand = find_max_hand_in_game(log_file, gamenumber)
   # wait for new game to start or new log file to be created
+  account_file = account_dir+"account_log.pdb"
+  conf = get_configs(account_file, log_file)
   while TRUE  do    
     newgamenumber = find_max_game( log_file)
     #newlog_file = find_last_log_file(log_dir)
@@ -696,21 +593,30 @@ def run_loop(log_dir,account_dir)
     end
     if proc_exists("pokerth") == FALSE
       puts "pokerth is not detected as running will exit now, you must run pokerth before pokerth_accounting.rb"
+      say("poker no longer running will exit accounting now")
       exit -1
     end
-    sleep(5)
+    sleep(3)
   end
-  puts "new game started"  
+  puts "new game started" 
+  say("new game started") 
   gamenumber = find_max_game( log_file)
   start_cash = get_start_cash(log_file, gamenumber)
+  lastbal = bal_CHP(conf["account"]).to_i  
   while TRUE  do
+    bal = bal_CHP(conf["account"]).to_i
+    if bal > lastbal
+      change = bal - lastbal
+      say("positive change in ballance of #{change} chips")
+    end
+    lastbal = bal
     puts "gamenumber = #{gamenumber}"
     puts "maxhand = #{maxhand}"
     newmaxhand = find_max_hand_in_game(log_file, gamenumber)
     if newmaxhand != maxhand
       # do check
-      puts "change detected"
-      #send_winner_hand_chips(log_file, gamenumber, newmaxhand, start_cash,account_dir)
+      puts "hand change detected"
+      say("hand change detected") 
       send_winning_hands_chips(log_file, gamenumber, newmaxhand, start_cash,account_dir)
       maxhand = newmaxhand
     end
@@ -720,9 +626,11 @@ def run_loop(log_dir,account_dir)
     end
     if proc_exists("pokerth") == FALSE
       puts "pokerth no longer running will exit now"
+      say("poker proc no longer running, will exit now")
+      exit -1
       break
     end
-    sleep(5)
+    sleep(1)
   end
 
 end
@@ -804,6 +712,7 @@ puts "#{str}"
 
 if str == "fail"
   puts "no STR funds in your account found, we will ask surething to send us some (this will take up to 30 secounds so please wait)"
+  say("you have no Stellar funds in your account, we will ask sure thing to send you some, please wait 30 seconds")
   update_surething(conf["accountserver"])
   str = bal_STR(conf["account"])
   if str != "fail"
@@ -813,6 +722,7 @@ if str == "fail"
     update_surething(conf["accountserver"])
   else
     puts "didn't get any STR from surething so maybe try again later or ??, will exit now and kill pokerth"
+    say("sorry we failed to get funding from sure thing,, you will have to find funding elsewhere, we will exit poker now")
     system("killall pokerth")
     exit -1
   end
@@ -833,12 +743,13 @@ if bal < 11000
   if bal < 11000
     puts "still no money seen delivered from surething, might try again later or barrow some funds from a freind, will shut down pokerth and exit now"
     # note this system call will have to be changed or removed for windows port
+    say("I am sorry we were unable to get funds from sure thing, you will have to find funds else where, we will now exit poker game")
     system("killall pokerth")
     exit -1
   end
 end
 
 update_players_accounts(full_account_log_file, conf["playernick"],conf["account"],conf["accountserver"])
-
+say("we now have stellar account funding and will start run loop")
 run_loop(log_dir,account_dir)
 
