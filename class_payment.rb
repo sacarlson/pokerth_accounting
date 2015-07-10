@@ -124,7 +124,7 @@ class Payment
   end
 
   def set_trust
-    puts "start set_trust"
+    #puts "start set_trust"
     hash = {"method"=>"submit", "params"=>[{"secret"=>"s3wmY....", "tx_json"=>{"TransactionType"=>"TrustSet", "Account"=>"gnwV....", "LimitAmount"=>{"currency"=>"CHP", "value"=>"1e+19", "issuer"=>"gBAd...."}, "Flags"=>131072}}]}
     #puts "#{hash["params"][0]["tx_json"]["LimitAmount"]["issuer"]}"
     hash["params"][0]["tx_json"]["LimitAmount"]["issuer"] = @data["params"][0]["tx_json"]["Amount"]["issuer"]
@@ -206,7 +206,7 @@ class Payment
     #puts "#{data}}"
     stat = data["result"]["status"].to_s
     if stat == "success" 
-      puts "#{data}"    
+      #puts "#{data}"    
       return data["result"]["account_data"]["Balance"].to_s    
     else
       return "fail"
@@ -286,7 +286,7 @@ end
 
 def send_native(from_issuer_pair, to_account, amount)
   stellar = Payment.new
-  puts "from account #{from_issuer_pair["account"]}"
+  #puts "from account #{from_issuer_pair["account"]}"
   stellar.set_account(from_issuer_pair["account"])
   stellar.set_secret(from_issuer_pair["secret"])
   stellar.set_currency("native")
@@ -348,12 +348,12 @@ def check_bal(account)
   stellar = Payment.new
   stellar.set_account(account)
   data = stellar.account_lines
-  puts "#{data}"
-  puts ""
-  puts ""
+  #puts "#{data}"
+  #puts ""
+  #puts ""
   #puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
   data = stellar.check_balance
-  puts "#{data}"
+  #puts "#{data}"
   return data
 end
 
@@ -361,7 +361,7 @@ def bal_STR(account)
   stellar = Payment.new
   stellar.set_account(account)
   data = stellar.check_balance
-  puts "native ballance #{data}"
+  #puts "native ballance #{data}"
   return data
 end
 
@@ -369,11 +369,11 @@ def bal_CHP(account)
   stellar = Payment.new
   stellar.set_account(account)
   data = stellar.account_lines
-  puts "#{data}"
+  #puts "#{data}"
   if data["result"]["lines"] == []
     return 0
   else  
-    puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
+    #puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
     return data["result"]["lines"][0]["balance"]
   end
 end

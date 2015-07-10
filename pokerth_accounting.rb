@@ -4,6 +4,8 @@ require 'sys/proctable'
 include Sys
 require 'sqlite3'
 require './class_payment'
+# this is the main program that run's in the background with pokerth that pools it's sqlite log files
+# to generate payment transactions to other pokerth players Stellar accounts when you loose a hand.
 
 # be sure to install these packages before you run this:
 # sudo apt-get install ruby-full sqlite3 ruby-sqlite3
@@ -26,10 +28,10 @@ log_dir=File.expand_path('~/.pokerth/log-files/')+"/"
 account_dir=File.expand_path('~/.pokerth/accounts/')+"/"
 Dir.mkdir(account_dir) unless File.directory?(account_dir)
 full_account_log_file=account_dir+account_log_file
-
+@start_dir = Dir.pwd
 
 # these values were just for function test setup only
-log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-09_001925.pdb"
+log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-09_200157.pdb"
 playername="sacarlson2"
 amount=100
 start_cash=1000
@@ -38,19 +40,22 @@ win_count=0
 handID = 1
 
 # presently disabled voice just runs on my computer but later will add to all if you want
-# this tells what is being sent to who and tells when you get a deposit delivered from winnings.
-# not sure if it will ever work on windows.  I'll add beeps for them or wav sounds
+# this tells what is being sent to who and tells when you get a deposit delivered from winnings and other status info from pokerth_accounting.
+# not sure if it will ever work on windows.  I'll add beeps for them or wav sounds if they want telling of events with sounds using win32-sound
 def say(string)
-#  command = "/home/sacarlson/github/poker_accounting/say.sh "+ "'" + string + "'"
-#  system(command)
+ # puts "#{@start_dir}"
+  command = @start_dir+"/say.sh "+ "'" + string + "'"
+  #puts "#{command}"
+  system(command)
 end
 
-say("poker accounting has started")
+#say("poker accounting has started")
+
 
 def send_surething_player_acc(playernick,stellar_acc,urlaccountserver)
   #url = "poker.surething.biz/player_list"
   #playernick = "test25" 
-  puts "send_sure #{playernick}"
+  #puts "send_sure #{playernick}"
   postdata = RestClient.get urlaccountserver + "?playernick=" + playernick +"&account="+ stellar_acc
   return JSON.parse(postdata)
 end
@@ -66,7 +71,7 @@ def update_players_accounts(full_account_log_file, playernick, stellar_acc,accou
     playername = row[1]
     stellar_acc = row[2]    
     #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}',NULL,'#{stellar_acc}',NULL,NULL, NULL,NULL)"
-    db.execute "INSERT or IGNORE INTO Players VALUES(NULL,'#{playername}',NULL,'#{stellar_acc}',NULL,NULL, NULL,NULL)"
+    db.execute "INSERT or IGNORE INTO Players VALUES(NULL,'#{playername}',0,'#{stellar_acc}',NULL,0, 0,0)"
   end
   db.close if db
 end
@@ -89,9 +94,9 @@ end
 
 def playername_to_accountID(playername, full_account_log_file)
   info = playername_info(playername, full_account_log_file)
-  puts "info = #{info}"
+  #puts "info = #{info}"
   if info.nil?
-    puts "info was nil"
+    #puts "info was nil"
     return "notset"
   else
     return playername_info(playername, full_account_log_file)[3].to_s
@@ -101,14 +106,14 @@ end
 
 def get_playernick(log_file)
     # this is to get the nickname you call yourself in the game from pokerth
-    puts "log_file = #{log_file}"
+    #puts "log_file = #{log_file}"
     db = SQLite3::Database.open log_file
     db.execute "PRAGMA journal_mode = WAL"
     stm = db.prepare "SELECT * FROM Player WHERE Seat='1' LIMIT 2" 
     rs = stm.execute
     rs.each do |row|
       #puts "row = #{row}"
-      puts "row[2] = #{row[2]}"
+      #puts "row[2] = #{row[2]}"
       return row[2]
     end   
 end
@@ -124,7 +129,7 @@ def get_configs(full_account_log_file, log_file)
     db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
         PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT)"
     db.execute "CREATE TABLE IF NOT EXISTS Players(Id INTEGER PRIMARY KEY, 
-        Name TEXT UNIQUE, Ballance INT, AccountID TEXT, master_seed TEXT, AccBal INT, AccBalLast INT, AccDiff INT)"
+        Name TEXT UNIQUE, Ballance INT DEFAULT 0, AccountID TEXT, master_seed TEXT, AccBal INT DEFAULT 0, AccBalLast INT DEFAULT 0, AccDiff INT DEFAULT 0)"
     db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
         Name TEXT, Amount INT, GameID INT, Log_file TEXT, AccountID TEXT, Time TEXT)"
     
@@ -133,31 +138,27 @@ def get_configs(full_account_log_file, log_file)
     #puts "c = #{c[0][0]}"
     exists = c[0][0]
     if exists == 0
-       puts "got here not exist"
+      #puts "got here does NOT exist"
       playernick = get_playernick(log_file)
-      puts "playernick from logs = #{playernick}"
+      #puts "playernick from logs = #{playernick}"
       if playernick.nil? 
-         puts "playernick return nil we must have a problem with pokerth log file"
-         puts "make sure you have already started pokerth for some time before running pokerth_accounting.rb or at least have ran it before recently so we have logs to read"
-         exit -1
+        puts "playernick return nil we must have a problem with pokerth log file"
+        puts "make sure you have already started pokerth for some time before running pokerth_accounting.rb or at least have ran it before recently so we have logs to read"
+        exit -1
       end
       acc_pair = create_new_account()
       config_hash["playernick"]=playernick
       config_hash["account"]=acc_pair["account"]
       config_hash["secreet"]=acc_pair["secreet"]
       config_hash["acc_pair"]=acc_pair
-      #add_CHP_trust(config_hash["stellarissuer"],acc_pair)
-      #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent',NULL,NULL,NULL,NULL, NULL,NULL)"
-      #db.execute "INSERT or REPLACE INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
-      db.execute "INSERT INTO Players VALUES(NULL,'Total_sent',NULL,NULL,NULL,NULL, NULL,NULL)"
       db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
     else
-      puts "got here does exist"
+      #puts "got here does exist"
       db.execute "PRAGMA journal_mode = WAL"
       rs = db.execute "SELECT * FROM Configs " 
       rs.each do |row|
-        puts "row = #{row}"
-        puts "row[2] = #{row[2]}"
+        #puts "row = #{row}"
+        #puts "row[2] = #{row[2]}"
         config_hash["new"]=FALSE
         config_hash["playernick"]=row[1]
         config_hash["account"]=row[2]
@@ -182,8 +183,8 @@ def get_configs(full_account_log_file, log_file)
   return config_hash
 end
 
- #puts "#{get_configs(full_account_log_file, log_file)}"
- #exit -1
+#puts "#{get_configs(full_account_log_file, log_file)}"
+#exit -1
 
 def update_account_log(full_account_log_file, log_file, playername,amount,gamenumber)
   #puts "playername = #{playername} amount #{amount}"
@@ -191,38 +192,12 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
   begin    
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Players(Id INTEGER PRIMARY KEY, 
-        Name TEXT UNIQUE, Ballance INT, AccountID TEXT, master_seed TEXT, AccBal INT, AccBalLast INT, AccDiff INT)"
+        Name TEXT UNIQUE, Ballance INT DEFAULT 0, AccountID TEXT, master_seed TEXT, AccBal INT DEFAULT 0, AccBalLast INT, AccDiff INT DEFAULT 0)"
     db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
         Name TEXT, Amount INT, GameID INT, Log_file TEXT, AccountID TEXT, Time TEXT)"
-
-    c = db.execute( "SELECT count(*) FROM Players WHERE Name = 'Total_sent'")
-    #puts "c = #{c[0][0]}"
-    exists = c[0][0]
-    if exists == 0
-      # this account is only used in test if you want to autocreate accounts for everyone that you are playing with
-      # it would have to be funded with STR and CHP if it was to be used. by default this is not used in the standard game mode any more
-      new_pair = create_new_account()
-      
-      #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
-      db.execute "INSERT INTO Players VALUES(NULL,'Total_sent','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
-    else
-      db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = 'Total_sent'"
-    end
-
-    c = db.execute( "SELECT count(*) FROM Players WHERE Name = '#{playername}'")
-    #puts "c = #{c[0][0]}"
-    exists = c[0][0]
-    if exists == 0
-      acc_issuer_account = playername_to_accountID("Total_sent", full_account_log_file)
-      acc_issuer_secret = playername_to_secret("Total_sent", full_account_log_file)
-      acc_issuer_pair = {"account"=>acc_issuer_account, "secret"=>acc_issuer_secret}
-      new_pair = create_new_account_with_CHP_trust(acc_issuer_pair)
-      puts "new_pair = #{new_pair}"
-      #db.execute "INSERT or REPLACE INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
-      db.execute "INSERT INTO Players VALUES(NULL,'#{playername}','#{amount}','#{new_pair["account"]}','#{new_pair["secret"]}',NULL, NULL,NULL)"
-    else
-      db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'"
-    end
+  
+    db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'"
+   
     timestr = DateTime.now
     #puts "time = #{timestr}"
     accountID = playername_to_accountID(playername, full_account_log_file)
@@ -238,8 +213,8 @@ def update_account_log(full_account_log_file, log_file, playername,amount,gamenu
   end
   db.close if db
 end
-
-#update_account_log(full_account_log_file,playername,amount,gamenumber)
+#playername = "zipperhead"
+#update_account_log(full_account_log_file, log_file,playername,amount,gamenumber)
 #exit -1
 
 
@@ -411,8 +386,9 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   puts "send player #{playername} in seat #{seat}  #{amount} amount of chips"
   saystring = "sending player #{playername}   #{amount}  chips"
   say(saystring)
+  update_account_log(account_file,log_file,playername,amount,gamenumber)
   # to enable sending stellar set bellow if to TRUE, this is for testing only
-  if TRUE
+  if FALSE
     config = get_configs(account_file, log_file)
     send_to_accountid = playername_to_accountID(playername, account_file)
     if send_to_accountid != "notset"
@@ -422,17 +398,17 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
         from_acc_accountid = config["account"]
         from_acc_secret = config["secret"]
         from_account_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
-        puts "#{from_account_pair}"
+        #puts "#{from_account_pair}"
         #send_CHP(from_issuer_pair, send_to_accountid, amount)
         #result = send_currency(from_issuer_pair, send_to_accountid, amount,config["currency"])
-        puts "issuer #{config["stellarissuer"]}"
+        #puts "issuer #{config["stellarissuer"]}"
         result = send_currency(from_account_pair, send_to_accountid, config["stellarissuer"], amount, config["currency"])
-        puts "#{result}"
+        #puts "#{result}"
         sleep 12
         stellar = Payment.new
         stellar.set_account(send_to_accountid)
         data = stellar.account_lines
-        puts "after deposit lines #{data}"
+        #puts "after deposit lines #{data}"
       else
         puts "winner #{playername} didn't have required CHP funds or lines of credit to allow payment, must have more than zero"
       end
@@ -446,6 +422,57 @@ end
 #send_player_chips(8,100,5,log_file)
 #exit -1
 
+
+def player_seat_account_add( seat, amount, gamenumber, log_file,account_dir)
+  #this will add this ammount to this players total_sent in the players Ballance in account local sqlite file records
+  playername = seatnumber_to_player( seat, gamenumber, log_file)
+  return player_sent_me(playername,amount,account_dir)
+end
+
+
+
+def player_sent_me(playername,amount,account_dir)
+  #this will add this ammount to this players total_sent in the players Ballance in account file records
+  account_file = account_dir+"account_log.pdb"
+  db = SQLite3::Database.open account_file
+  db.execute "PRAGMA journal_mode = WAL"
+  db.results_as_hash = true
+  return db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'" 
+    
+end
+#playername = "surething"
+#amount = 10
+#result = player_sent_me(playername,amount,account_dir)
+#puts "#{result}"
+#exit -1
+
+def player_seat_account_ballance(seat, amount, gamenumber, log_file,account_dir)
+  playername = seatnumber_to_player( seat, gamenumber, log_file)
+  return player_account_ballance(playername, account_dir)
+end
+
+def player_account_ballance(playername, account_dir)
+  #this is the present value seen in the account log for this player
+  # don't confuse this with what is seen in pokerth log_file
+  # this should become the accumulated ballance of all the games played with player from the start of account log creation
+  # it could be positive or negitive, positive ballance means you have sent him more money then he has sent you
+  account_file = account_dir+"account_log.pdb"
+  db = SQLite3::Database.open account_file
+  db.execute "PRAGMA journal_mode = WAL"
+  db.results_as_hash = true
+  #return db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'" 
+  stm = db.prepare "SELECT * FROM Players WHERE Name = '#{playername}'"       
+  rs = stm.execute
+  rs.each do |row|
+    #puts "#{row}"
+    #puts "#{row["Ballance"]}"
+    return row["Ballance"]    
+  end
+end
+#playername = "zipperhead"
+#result = player_account_ballance(playername,account_dir)
+#puts "#{result}"
+#exit -1
 
 def get_players_cash_holdings(log_file, gamenumber, handID, start_cash)
   #return an hash with each players cash holdings at this point in gamenumber, handID with this start_cash. the players are id by seat number in hash string
@@ -491,6 +518,7 @@ def get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
   #puts "last #{last}"
   present.each do |x|
     #puts "#{x}"
+    # x[0] = seat number in string  x[1] = value of this seat number
     #puts "#{x[0]} #{last[x[0]]}"
     z = x[1] - last[x[0]]
     #puts "z = #{z}"
@@ -504,10 +532,14 @@ end
 #exit -1
 
 def count_winners(log_file, gamenumber, handID, start_cash)
-  #return the number of winners in this hand not counting you, if you win return is 0
+  #return the number of winners in this hand not counting you, if you didn't loss or win anything return 0
+  # return -1 if you player #1 was the winner
   change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
-  if change["1"] >= 0
+  if change["1"] == 0
     return 0
+  end
+  if change["1"] > 0
+    return -1
   end
   count = 0
   change.each do |x|
@@ -523,14 +555,128 @@ end
 #puts "#{result}"
 #exit -1
 
+def we_have_game_winner(log_file, gamenumber)
+  # we have game winner will return 0 if no winner of the game yet,  will return seat of the winner if final winner of this game has won
+  begin
+    db = SQLite3::Database.open log_file
+    db.execute "PRAGMA journal_mode = WAL"
+    stm = db.prepare "SELECT * FROM Action WHERE UniqueGameID=#{gamenumber} AND Action='wins game' LIMIT 2" 
+    rs = stm.execute
+    rs.each do |row|
+      #puts "row = #{row}"
+      #puts "row 4 = #{row[4]}"
+      return row[4]
+    end
+  rescue SQLite3::Exception => e 
+    
+    puts "Exception occurred"
+    puts e
+    
+  ensure
+    stm.close if stm
+    db.close if db
+  end
+  return 0
+end
+#result = we_have_winner(log_file, gamenumber)
+#puts "#{result}"
+#exit -1
+
+def cash_left(log_file,gamenumber,handID)
+   begin
+    db = SQLite3::Database.open log_file
+    db.execute "PRAGMA journal_mode = WAL"
+    stm = db.prepare "SELECT * FROM Hand WHERE UniqueGameID=#{gamenumber} AND HandID=#{handID} LIMIT 2" 
+    rs = stm.execute
+    rs.each do |row|
+      #puts "row = #{row}"
+      #puts "row 7 = #{row[7]}"
+      return row[7]
+    end
+  rescue SQLite3::Exception => e 
+    
+    puts "Exception occurred"
+    puts e
+    
+  ensure
+    stm.close if stm
+    db.close if db
+  end
+  return 0
+end
+#handID = 18
+#gamenumber = 1
+#result = cash_left(log_file,gamenumber,handID)
+#puts "#{result}"
+#exit -1
+
+def find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir)
+  # this looks for account changes in each player including you to find who owes you money or who you owe money to
+  # if you owe money it sends the money to each of them,  if they owe you it records this in there Player account records
+  win_count = count_winners(log_file, gamenumber, handID, start_cash)
+  if win_count == 0
+    return
+  end 
+  change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
+  change.each do |x|
+    #puts "#{x}"
+    if x[0] != "1"
+      if x[1] > 0
+        #puts "#{x}"
+        amount = x[1]/win_count
+        winner_seat = x[0]
+        puts "you sent player #{amount}"    
+        send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
+        #add the oposite to your own account in this case change positive to negitive
+        player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
+      end
+      if x[1] < 0
+        amount = x[1]
+        loosing_seat = x[0]
+        puts "player sent you #{amount}"
+        # note the amount sent here is a negitive numbers but I guess that ok as that's what they add up oweing you
+        results =player_seat_account_ballance(loosing_seat, amount, gamenumber, log_file,account_dir)
+        puts "player account ballance before player_seat_account_add #{results}"
+        player_seat_account_add( loosing_seat, amount, gamenumber, log_file,account_dir)
+        #add the oposite to your own account
+        player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
+        results =player_seat_account_ballance(loosing_seat, amount, gamenumber, log_file,account_dir)
+        puts "player account ballance now #{results}"
+      end
+    end
+  end
+end
+
+
+
 def send_winning_hands_chips(log_file, gamenumber, handID, start_cash,account_dir)
-  # this is a new version of send_winner_hand_chips to make it easier to read and work from first hand instead of delayed
+  # this is a new version of send_winner_hand_chips to make it easier to read and add more accounting to what players should have sent you
+  # so that we can verify that the Stellar transactions worked.  
   # this will detect if there are any winners in this handID, and will setup to pay each of them what you owe them
-  # I would also like to add to this at some point to keep track of what other players have lost to you and store a record of its total
-  say("hand i d #{handID} in send winnings")
+  # we now acumulate what each player you have every played with has made or lost to you in accounts Players Ballance table
+  # later I might add if the ballance is not correct between our local and Stellar ballance,
+  # that we can withhold funds for the difference in future games we play with that player.
+  say("hand i d #{handID} ")
   winner_seat = we_have_game_winner(log_file, gamenumber).to_i
+  #winner_seat = 0
   if winner_seat == 1
-    puts "congradulations your the winner, no more money to be sent for this game"
+    puts "congradulations your the winner, last players will send you the last of there money and change from last hand on record"
+    find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir)
+    last_holding = get_players_cash_holdings(log_file, gamenumber, handID, start_cash)
+    last_holding.each do |x|
+      #puts "#{x}"
+      if x[0] != "1"
+        loosing_seat = x[0]
+        amount = x[1]
+        if amount > 0
+          # reverse sign to negitive as they are sending you money making there ballance negitive
+          amount = amount * -1
+          puts "player seat #{loosing_seat} sent you #{amount}"
+          player_seat_account_add(loosing_seat, amount, gamenumber, log_file,account_dir)
+          player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
+        end
+      end
+    end    
     say("congradulations your the winner of this game, we will now exit poker accounting")
     exit -1
     return
@@ -541,29 +687,19 @@ def send_winning_hands_chips(log_file, gamenumber, handID, start_cash,account_di
     say("you have lost this game, we will send last of your funds #{amount} to the winner and exit accounting")
     if amount > 0
       send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
+      player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
     end
+    # also need to send diff from last recorded hand
+    find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir)
     exit -1
     return
   end
-  
-  win_count = count_winners(log_file, gamenumber, handID, start_cash)
-  if win_count == 0
-    return
-  end 
-  change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
-  change.each do |x|
-    #puts "#{x}"
-    if x[1] > 0
-      #puts "#{x}"
-      amount = x[1]/win_count
-      winner_seat = x[0]
-      send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
-    end
-  end
+
+  find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir)
   return
 end
 
-#handID = 3
+#handID = 7
 #result = send_winning_hands_chips(log_file, gamenumber, handID, start_cash,account_dir)
 #puts "#{result}"
 #exit -1
@@ -610,8 +746,8 @@ def run_loop(log_dir,account_dir)
       say("positive change in ballance of #{change} chips")
     end
     lastbal = bal
-    puts "gamenumber = #{gamenumber}"
-    puts "maxhand = #{maxhand}"
+    #puts "gamenumber = #{gamenumber}"
+    #puts "maxhand = #{maxhand}"
     newmaxhand = find_max_hand_in_game(log_file, gamenumber)
     if newmaxhand != maxhand
       # do check
@@ -622,15 +758,18 @@ def run_loop(log_dir,account_dir)
     end
     newgamenumber = find_max_game( log_file)
     if newgamenumber != gamenumber
+      update_surething(conf["accountserver"])
       break
     end
     if proc_exists("pokerth") == FALSE
       puts "pokerth no longer running will exit now"
       say("poker proc no longer running, will exit now")
+      # this will update your account ballance on the poker.surething.biz website for people to see
+      update_surething(conf["accountserver"])
       exit -1
       break
     end
-    sleep(1)
+    sleep(2)
   end
 
 end
@@ -646,58 +785,7 @@ def update_surething(urlaccountserver)
   #return JSON.parse(postdata)
 end
 
-def we_have_game_winner(log_file, gamenumber)
-  # we have game winner will return 0 if no winner of the game yet,  will return seat of the winner if final winner of this game has won
-  begin
-    db = SQLite3::Database.open log_file
-    db.execute "PRAGMA journal_mode = WAL"
-    stm = db.prepare "SELECT * FROM Action WHERE UniqueGameID=#{gamenumber} AND Action='wins game' LIMIT 2" 
-    rs = stm.execute
-    rs.each do |row|
-      #puts "row = #{row}"
-      #puts "row 4 = #{row[4]}"
-      return row[4]
-    end
-  rescue SQLite3::Exception => e 
-    
-    puts "Exception occurred"
-    puts e
-    
-  ensure
-    stm.close if stm
-    db.close if db
-  end
-  return 0
-end
-#result = we_have_winner(log_file, gamenumber)
-#puts "#{result}"
 
-def cash_left(log_file,gamenumber,handID)
-   begin
-    db = SQLite3::Database.open log_file
-    db.execute "PRAGMA journal_mode = WAL"
-    stm = db.prepare "SELECT * FROM Hand WHERE UniqueGameID=#{gamenumber} AND HandID=#{handID} LIMIT 2" 
-    rs = stm.execute
-    rs.each do |row|
-      #puts "row = #{row}"
-      #puts "row 7 = #{row[7]}"
-      return row[7]
-    end
-  rescue SQLite3::Exception => e 
-    
-    puts "Exception occurred"
-    puts e
-    
-  ensure
-    stm.close if stm
-    db.close if db
-  end
-  return 0
-end
-#handID = 18
-#gamenumber = 1
-#result = cash_left(log_file,gamenumber,handID)
-#puts "#{result}"
 
 #exit -1
 
@@ -752,4 +840,6 @@ end
 update_players_accounts(full_account_log_file, conf["playernick"],conf["account"],conf["accountserver"])
 say("we now have stellar account funding and will start run loop")
 run_loop(log_dir,account_dir)
+
+puts "run_loop exited"
 
