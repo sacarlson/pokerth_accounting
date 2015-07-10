@@ -388,13 +388,13 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   say(saystring)
   update_account_log(account_file,log_file,playername,amount,gamenumber)
   # to enable sending stellar set bellow if to TRUE, this is for testing only
-  if FALSE
+  if TRUE
     config = get_configs(account_file, log_file)
     send_to_accountid = playername_to_accountID(playername, account_file)
     if send_to_accountid != "notset"
       bal = bal_CHP(send_to_accountid).to_i
       if bal > 0
-        update_account_log(account_file,log_file,playername,amount,gamenumber)
+        #update_account_log(account_file,log_file,playername,amount,gamenumber)
         from_acc_accountid = config["account"]
         from_acc_secret = config["secret"]
         from_account_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
