@@ -43,13 +43,43 @@ handID = 1
 # this tells what is being sent to who and tells when you get a deposit delivered from winnings and other status info from pokerth_accounting.
 # not sure if it will ever work on windows.  I'll add beeps for them or wav sounds if they want telling of events with sounds using win32-sound
 def say(string)
- # puts "#{@start_dir}"
-  command = @start_dir+"/say.sh "+ "'" + string + "'"
-  #puts "#{command}"
-  system(command)
+  if @config["audio"] != "Disable"
+    #puts "#{@start_dir}"
+    command = @start_dir+"/say.sh "+ "'" + string + "'"
+    #puts "#{command}"
+    system(command)
+  end
 end
 
 #say("poker accounting has started")
+
+def check_db_version(full_account_log_file)
+  # this will check to see what user_version of the acounting sqlite database that is now present
+  # if it detects an older version it will upgrade it to the new version
+  db = SQLite3::Database.open full_account_log_file
+  result = db.execute("PRAGMA user_version;")
+  #puts "#{result[0][0]}"
+  if result[0][0] == 0
+    puts "old version of account db detected will upgrade to version 1 from 0"   
+    result = db.execute("ALTER TABLE Configs ADD COLUMN Chip_Mult REAL;") 
+    result = db.execute("ALTER TABLE Configs ADD COLUMN Stellar TEXT;")
+    result = db.execute("ALTER TABLE Configs ADD COLUMN Audio TEXT;")
+    result = db.execute("ALTER TABLE Configs ADD COLUMN Loop_Time INT;")
+    result = db.execute("ALTER TABLE Configs ADD COLUMN Mode INT;")
+    result = db.execute("UPDATE Configs SET Chip_Mult = '1'")
+    result = db.execute("UPDATE Configs SET Stellar = 'Enable'")
+    result = db.execute("UPDATE Configs SET Audio = 'Disable'")
+    result = db.execute("UPDATE Configs SET Loop_Time = '2'")
+    result = db.execute("UPDATE Configs SET Mode = 'Standard'")
+    result = db.execute("PRAGMA user_version = 1;")   
+  else
+    puts "new accounting version checked ok with version #{result[0][0]}"
+    #result = db.execute("PRAGMA user_version = '0';")
+  end
+end
+
+#check_db_version(full_account_log_file)
+#exit -1
 
 
 def send_surething_player_acc(playernick,stellar_acc,urlaccountserver)
@@ -167,7 +197,12 @@ def get_configs(full_account_log_file, log_file)
         config_hash["currency"]=row[4]  
         config_hash["paymenturl"]=row[5]
         config_hash["stellarissuer"]=row[6]
-        config_hash["accountserver"]=row[7]     
+        config_hash["accountserver"]=row[7]
+        config_hash["Chip_Mult"]=row[8]
+        config_hash["stellar"]=row[9]
+        config_hash["audio"]=row[10]
+        config_hash["loop_time"]=row[11] 
+        config_hash["mode"]=row[12]      
       end   
     end
 
@@ -388,21 +423,23 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   say(saystring)
   update_account_log(account_file,log_file,playername,amount,gamenumber)
   # to enable sending stellar set bellow if to TRUE, this is for testing only
-  if TRUE
-    config = get_configs(account_file, log_file)
+  if @config["Stellar"]=="Enable"
+    @config = get_configs(account_file, log_file)
+    amount = amount / @config["chip_mult"]
+    puts "after chip_mult calculation you will be sending #{amount} or currency #{@config["currency"]}"
     send_to_accountid = playername_to_accountID(playername, account_file)
     if send_to_accountid != "notset"
       bal = bal_CHP(send_to_accountid).to_i
       if bal > 0
         #update_account_log(account_file,log_file,playername,amount,gamenumber)
-        from_acc_accountid = config["account"]
-        from_acc_secret = config["secret"]
+        from_acc_accountid = @config["account"]
+        from_acc_secret = @config["secret"]
         from_account_pair = {"account"=>from_acc_accountid, "secret"=>from_acc_secret}
         #puts "#{from_account_pair}"
         #send_CHP(from_issuer_pair, send_to_accountid, amount)
-        #result = send_currency(from_issuer_pair, send_to_accountid, amount,config["currency"])
-        #puts "issuer #{config["stellarissuer"]}"
-        result = send_currency(from_account_pair, send_to_accountid, config["stellarissuer"], amount, config["currency"])
+        #result = send_currency(from_issuer_pair, send_to_accountid, amount,@config["currency"])
+        #puts "issuer #{@config["stellarissuer"]}"
+        result = send_currency(from_account_pair, send_to_accountid, @config["stellarissuer"], amount, @config["currency"])
         #puts "#{result}"
         sleep 12
         stellar = Payment.new
@@ -717,7 +754,7 @@ def run_loop(log_dir,account_dir)
   maxhand = find_max_hand_in_game(log_file, gamenumber)
   # wait for new game to start or new log file to be created
   account_file = account_dir+"account_log.pdb"
-  conf = get_configs(account_file, log_file)
+  #@config = get_configs(account_file, log_file)
   while TRUE  do    
     newgamenumber = find_max_game( log_file)
     #newlog_file = find_last_log_file(log_dir)
@@ -738,9 +775,9 @@ def run_loop(log_dir,account_dir)
   say("new game started") 
   gamenumber = find_max_game( log_file)
   start_cash = get_start_cash(log_file, gamenumber)
-  lastbal = bal_CHP(conf["account"]).to_i  
+  lastbal = bal_CHP(@config["account"]).to_i  
   while TRUE  do
-    bal = bal_CHP(conf["account"]).to_i
+    bal = bal_CHP(@config["account"]).to_i
     if bal > lastbal
       change = bal - lastbal
       say("positive change in ballance of #{change} chips")
@@ -758,18 +795,19 @@ def run_loop(log_dir,account_dir)
     end
     newgamenumber = find_max_game( log_file)
     if newgamenumber != gamenumber
-      update_surething(conf["accountserver"])
+      update_surething(@config["accountserver"])
       break
     end
     if proc_exists("pokerth") == FALSE
       puts "pokerth no longer running will exit now"
       say("poker proc no longer running, will exit now")
       # this will update your account ballance on the poker.surething.biz website for people to see
-      update_surething(conf["accountserver"])
+      update_surething(@config["accountserver"])
       exit -1
       break
     end
-    sleep(2)
+    # default loop_time is 2 sec
+    sleep(@config["loop_time"])
   end
 
 end
@@ -787,27 +825,27 @@ end
 
 
 
-#exit -1
-
 log_file = find_last_log_file(log_dir)
 full_log_file = log_dir+log_file
-conf = get_configs(full_account_log_file, full_log_file)
-puts "#{conf}"
+check_db_version(full_account_log_file)
 
-str = bal_STR(conf["account"])
+@config = get_configs(full_account_log_file, full_log_file)
+puts "#{@config}"
+
+str = bal_STR(@config["account"])
 puts "#{str}"
 
 
 if str == "fail"
   puts "no STR funds in your account found, we will ask surething to send us some (this will take up to 30 secounds so please wait)"
   say("you have no Stellar funds in your account, we will ask sure thing to send you some, please wait 30 seconds")
-  update_surething(conf["accountserver"])
-  str = bal_STR(conf["account"])
+  update_surething(@config["accountserver"])
+  str = bal_STR(@config["account"])
   if str != "fail"
     puts "ok now we got STR #{str} so lets add trust and ask for some CHP from surething"
-    puts "add trust stellar issuer #{conf["stellarissuer"]} to pair #{conf["acc_pair"]}"
-    add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
-    update_surething(conf["accountserver"])
+    puts "add trust stellar issuer #{@config["stellarissuer"]} to pair #{@config["acc_pair"]}"
+    add_CHP_trust(@config["stellarissuer"],@config["acc_pair"])
+    update_surething(@config["accountserver"])
   else
     puts "didn't get any STR from surething so maybe try again later or ??, will exit now and kill pokerth"
     say("sorry we failed to get funding from sure thing,, you will have to find funding elsewhere, we will exit poker now")
@@ -816,18 +854,18 @@ if str == "fail"
   end
 end
 
-bal = bal_CHP(conf["account"]).to_i
+bal = bal_CHP(@config["account"]).to_i
 puts "CHP ballance #{bal}"
 if bal < 11000
   puts "Your CHP chip ballance is bellow 11,000 CHP, you don't have enuf funds to start a game, we will kill pokerth now"
   puts "Talk to Scotty (sacarlson) or one of your freinds to loan you some chips or ??"
   puts "You should also be able to see your CHP ballance at http://poker.surething.biz  look for your pokerth nickname"
   puts " also we will request a donation from surething now in hopes they give you some"
-  puts "add trust stellar issuer #{conf["stellarissuer"]} to pair #{conf["acc_pair"]}"
-  add_CHP_trust(conf["stellarissuer"],conf["acc_pair"])
-  update_surething(conf["accountserver"])
+  puts "add trust stellar issuer #{@config["stellarissuer"]} to pair #{@config["acc_pair"]}"
+  add_CHP_trust(@config["stellarissuer"],@config["acc_pair"])
+  update_surething(@config["accountserver"])
   sleep 15
-  bal = bal_CHP(conf["account"]).to_i
+  bal = bal_CHP(@config["account"]).to_i
   if bal < 11000
     puts "still no money seen delivered from surething, might try again later or barrow some funds from a freind, will shut down pokerth and exit now"
     # note this system call will have to be changed or removed for windows port
@@ -837,7 +875,7 @@ if bal < 11000
   end
 end
 
-update_players_accounts(full_account_log_file, conf["playernick"],conf["account"],conf["accountserver"])
+update_players_accounts(full_account_log_file, @config["playernick"],@config["account"],@config["accountserver"])
 say("we now have stellar account funding and will start run loop")
 run_loop(log_dir,account_dir)
 
