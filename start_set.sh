@@ -1,5 +1,15 @@
-# this script brings up both pokerth and pokerth_accounting.rb in the correct sequence on a linux system
-# you will have to modify this file to point to the directory you have these files installed
-nohup /home/sacarlson/github/pokerth/pokerth &
+# this script brings up both pokerth and pokerth_accounting.rb in the correct sequence timing on a linux system
+MY_PATH="`dirname \"$0\"`"              # relative
+MY_PATH="`( cd \"$MY_PATH\" && pwd )`"  # absolutized and normalized
+if [ -z "$MY_PATH" ] ; then
+  # error; for some reason, the path is not accessible
+  # to the script (e.g. permissions re-evaled after suid)
+  exit 1  # fail
+fi
+#echo "$MY_PATH"
+export PATH=~/github/pokerth:$PATH
+nohup pokerth &
 sleep 5
-/home/sacarlson/github/poker_accounting/pokerth_accounting.rb
+
+cd $MY_PATH
+./pokerth_accounting.rb
