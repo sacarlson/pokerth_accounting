@@ -22,6 +22,10 @@ if ($playernick == "notset") {
   exit;
 }
 
+if (strlen($playernick) < 2) {
+  exit;
+}
+
 $sql = "REPLACE INTO Players (PlayerNick, AccountID,Date_Created) VALUES ('" . $playernick . "','" . $acc . "',NOW())";
 
 
