@@ -506,7 +506,7 @@ end
 #puts "#{result}"
 #exit -1
 
-def player_seat_account_ballance(seat, amount, gamenumber, log_file,account_dir)
+def player_seat_account_ballance(seat, gamenumber, log_file,account_dir)
   playername = seatnumber_to_player( seat, gamenumber, log_file)
   return player_account_ballance(playername, account_dir)
 end
@@ -708,13 +708,14 @@ def find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir
         amount = your_change.abs/win_count.abs
         loosing_seat = x[0]
         puts "player in seat #{loosing_seat} sent you #{amount}"
-        # note the amount sent here is a negitive numbers but I guess that ok as that's what they add up oweing you
-        results =player_seat_account_ballance(loosing_seat, amount, gamenumber, log_file,account_dir)
+        
+        results =player_seat_account_ballance(loosing_seat, gamenumber, log_file,account_dir)
         puts "player seat #{loosing_seat} account ballance before player_seat_account_add #{results}"
-        player_seat_account_add( loosing_seat, amount, gamenumber, log_file,account_dir)
+        # note the amount sent here is a positive numbers now so we will invert it to negitive here 
+        player_seat_account_add( loosing_seat, amount * -1, gamenumber, log_file,account_dir)
         #add the oposite to your own account in this case they send us negitive number so here we make it positive and add to our account
-        player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
-        results = player_seat_account_ballance(loosing_seat, amount, gamenumber, log_file,account_dir)
+        player_seat_account_add( "1",amount , gamenumber, log_file,account_dir)
+        results = player_seat_account_ballance(loosing_seat, gamenumber, log_file,account_dir)
         puts "player account ballance now #{results}"
       end
     end

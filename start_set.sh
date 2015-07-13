@@ -7,7 +7,9 @@ if [ -z "$MY_PATH" ] ; then
   exit 1  # fail
 fi
 #echo "$MY_PATH"
-export PATH=~/github/pokerth:$PATH
+export PATH=/home/sacarlson/github/pokerth:$PATH
+echo $PATH
+
 nohup pokerth &
 sleep 5
 
