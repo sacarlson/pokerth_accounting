@@ -31,7 +31,7 @@ full_account_log_file=account_dir+account_log_file
 @start_dir = Dir.pwd
 
 # these values were just for function test setup only
-log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-09_200157.pdb"
+log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-13_135606.pdb"
 playername="sacarlson2"
 amount=100
 start_cash=1000
@@ -106,6 +106,30 @@ def update_players_accounts(full_account_log_file, playernick, stellar_acc,accou
   db.close if db
 end
 
+def add_player_to_list(full_account_log_file,playernick)
+  db = SQLite3::Database.open full_account_log_file 
+  db.execute "PRAGMA journal_mode = WAL;"
+  db.execute "INSERT or IGNORE INTO Players VALUES(NULL,'#{playernick}',0,'notset',NULL,0, 0,0);"
+  #db.close if db
+end
+
+def update_players_list(full_account_log_file, log_file,gamenumber)
+  puts "#{full_account_log_file}"
+  #data = send_surething_player_acc(playernick,stellar_acc,accountserver)
+  db = SQLite3::Database.open log_file
+  db.execute "PRAGMA journal_mode = WAL;"
+  stm = db.prepare "SELECT * FROM Player WHERE UniqueGameID=#{gamenumber} ;" 
+  rs = stm.execute
+  rs.each do |row|
+    #puts "#{row}"
+    puts "#{row[2]}"
+    playernick = row[2]
+    add_player_to_list(full_account_log_file,playernick)
+  end
+end
+#results = update_players_list(full_account_log_file, log_file)
+#puts "#{results}"
+#exit -1
 
 def playername_info(playername, full_account_log_file)
   db = SQLite3::Database.open full_account_log_file
@@ -139,7 +163,7 @@ def get_playernick(log_file)
     #puts "log_file = #{log_file}"
     db = SQLite3::Database.open log_file
     db.execute "PRAGMA journal_mode = WAL"
-    stm = db.prepare "SELECT * FROM Player WHERE Seat='1' LIMIT 2" 
+    stm = db.prepare "SELECT * FROM Player WHERE Seat='1' LIMIT 1 " 
     rs = stm.execute
     rs.each do |row|
       #puts "row = #{row}"
@@ -152,7 +176,7 @@ end
 #exit -1
 
 
-def get_configs(full_account_log_file, log_file)
+def get_configs(full_account_log_file)
   config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"poker.surething.biz/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}}
   begin    
     db = SQLite3::Database.open full_account_log_file
@@ -218,7 +242,7 @@ def get_configs(full_account_log_file, log_file)
   return config_hash
 end
 
-#puts "#{get_configs(full_account_log_file, log_file)}"
+#puts "#{get_configs(full_account_log_file)}"
 #exit -1
 
 def update_account_log(full_account_log_file, log_file, playername,amount,gamenumber)
@@ -424,7 +448,7 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   update_account_log(account_file,log_file,playername,amount,gamenumber)
   # setting stellar to Disable will skip sending chips to other players, this puts us into the local only accounting mode
   if @config["stellar"]=="Enable"
-    @config = get_configs(account_file, log_file)
+    @config = get_configs(account_file)
     amount = amount / @config["chip_mult"]
     puts "after chip_mult calculation you will be sending #{amount} or currency #{@config["currency"]}"
     send_to_accountid = playername_to_accountID(playername, account_file)
@@ -575,13 +599,20 @@ def count_winners(log_file, gamenumber, handID, start_cash)
     return 0
   end
   if change["1"] > 0
-    return -1
-  end
-  count = 0
-  change.each do |x|
-    #puts "#{x}"
-    if x[1] > 0
-      count = count + 1
+    count = 0
+    change.each do |x|
+      #puts "#{x}"
+      if x[1] < 0
+        count = count - 1
+      end
+    end
+  else
+    count = 0
+    change.each do |x|
+      #puts "#{x}"
+      if x[1] > 0
+        count = count + 1
+      end
     end
   end
   return count
@@ -649,34 +680,41 @@ end
 def find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir)
   # this looks for account changes in each player including you to find who owes you money or who you owe money to
   # if you owe money it sends the money to each of them,  if they owe you it records this in there Player account records
+
+  # count_winners return the number positive of number of winners in this hand not counting you, if you didn't loss or win anything return 0
+  # return negitve if you player #1 was the winner with negitive count of loosers
   win_count = count_winners(log_file, gamenumber, handID, start_cash)
   if win_count == 0
     return
   end 
+  
+  puts "win count #{win_count}"
   change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
+  your_change = change["1"]
+  puts "your change #{your_change}"
   change.each do |x|
     #puts "#{x}"
     if x[0] != "1"
       if x[1] > 0
-        #puts "#{x}"
-        amount = x[1]/win_count
+        puts "#{x}"
+        amount = your_change.abs/win_count.abs
         winner_seat = x[0]
-        puts "you sent player #{amount}"    
+        puts "you sent player in seat #{winner_seat}  #{amount} chips"    
         send_player_chips( winner_seat, amount, gamenumber, log_file,account_dir)
         #add the oposite to your own account in this case change positive to negitive
         player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
       end
-      if x[1] < 0
-        amount = x[1]
+      if ((x[1] < 0) and (win_count < 0))
+        amount = your_change.abs/win_count.abs
         loosing_seat = x[0]
-        puts "player sent you #{amount}"
+        puts "player in seat #{loosing_seat} sent you #{amount}"
         # note the amount sent here is a negitive numbers but I guess that ok as that's what they add up oweing you
         results =player_seat_account_ballance(loosing_seat, amount, gamenumber, log_file,account_dir)
-        puts "player account ballance before player_seat_account_add #{results}"
+        puts "player seat #{loosing_seat} account ballance before player_seat_account_add #{results}"
         player_seat_account_add( loosing_seat, amount, gamenumber, log_file,account_dir)
-        #add the oposite to your own account
+        #add the oposite to your own account in this case they send us negitive number so here we make it positive and add to our account
         player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
-        results =player_seat_account_ballance(loosing_seat, amount, gamenumber, log_file,account_dir)
+        results = player_seat_account_ballance(loosing_seat, amount, gamenumber, log_file,account_dir)
         puts "player account ballance now #{results}"
       end
     end
@@ -752,19 +790,15 @@ def run_loop(log_dir,account_dir)
   full_log_file = log_dir+log_file
   puts "full_log_file = #{full_log_file}"
   puts "log_file: #{log_file}"
-  gamenumber = find_max_game( log_file)
-  #start_cash = get_start_cash(log_file, gamenumber)
+  gamenumber = find_max_game( full_log_file)
+  #start_cash = get_start_cash(full_log_file, gamenumber)
   #puts "start_cash = #{start_cash}"
-  maxhand = find_max_hand_in_game(log_file, gamenumber)
+  maxhand = find_max_hand_in_game(full_log_file, gamenumber)
   # wait for new game to start or new log file to be created
   account_file = account_dir+"account_log.pdb"
-  #@config = get_configs(account_file, log_file)
   while TRUE  do    
-    newgamenumber = find_max_game( log_file)
-    #newlog_file = find_last_log_file(log_dir)
+    newgamenumber = find_max_game( full_log_file)
     puts "newgamenumber = #{newgamenumber}"
-    #puts "newlog_file = #{newlog_file}"
-    #if newgamenumber != gamenumber || newlog_file != log_file
     if newgamenumber != gamenumber 
       break
     end
@@ -777,8 +811,9 @@ def run_loop(log_dir,account_dir)
   end
   puts "new game started" 
   say("new game started") 
-  gamenumber = find_max_game( log_file)
-  start_cash = get_start_cash(log_file, gamenumber)
+  gamenumber = find_max_game(full_log_file)
+  start_cash = get_start_cash(full_log_file, gamenumber)
+  update_players_list(account_file,full_log_file, gamenumber)
   if @config["stellar"]=="Enable"
     lastbal = bal_CHP(@config["account"]).to_i 
   end 
@@ -793,15 +828,15 @@ def run_loop(log_dir,account_dir)
     end
     #puts "gamenumber = #{gamenumber}"
     #puts "maxhand = #{maxhand}"
-    newmaxhand = find_max_hand_in_game(log_file, gamenumber)
+    newmaxhand = find_max_hand_in_game(full_log_file, gamenumber)
     if newmaxhand != maxhand
       # do check
       puts "hand change detected"
       say("hand change detected") 
-      send_winning_hands_chips(log_file, gamenumber, newmaxhand, start_cash,account_dir)
+      send_winning_hands_chips(full_log_file, gamenumber, newmaxhand, start_cash,account_dir)
       maxhand = newmaxhand
     end
-    newgamenumber = find_max_game( log_file)
+    newgamenumber = find_max_game( full_log_file)
     if newgamenumber != gamenumber
       update_surething(@config["accountserver"])
       break
@@ -837,7 +872,7 @@ log_file = find_last_log_file(log_dir)
 full_log_file = log_dir+log_file
 check_db_version(full_account_log_file)
 
-@config = get_configs(full_account_log_file, full_log_file)
+@config = get_configs(full_account_log_file)
 puts "#{@config}"
 
  # if stellar is disabled we won't need all this stuf checked, only local accounting in sqlite file will be done
