@@ -31,20 +31,26 @@ full_account_log_file=account_dir+account_log_file
 @start_dir = Dir.pwd
 
 # these values were just for function test setup only
-log_file="/home/sacarlson/.pokerth/log-files/pokerth-log-2015-07-13_135606.pdb"
+log_file="/home/sacarlson/.pokerth/accounts/pokerth-log-2015-07-13_135606.pdb"
 playername="sacarlson2"
 amount=100
-start_cash=1000
+start_cash=10000
 gamenumber=1
 win_count=0
-handID = 1
+handID = 8
 
 # presently disabled voice just runs on my computer but later will add to all if you want
 # this tells what is being sent to who and tells when you get a deposit delivered from winnings and other status info from pokerth_accounting.
 # not sure if it will ever work on windows.  I'll add beeps for them or wav sounds if they want telling of events with sounds using win32-sound
 def say(string)
+  if @config.nil?
+    return
+  end
   if @config["audio"] != "Disable"
     #puts "#{@start_dir}"
+    if string.nil?
+      return
+    end
     command = @start_dir+"/say.sh "+ "'" + string + "'"
     #puts "#{command}"
     system(command)
@@ -497,8 +503,7 @@ def player_sent_me(playername,amount,account_dir)
   db = SQLite3::Database.open account_file
   db.execute "PRAGMA journal_mode = WAL"
   db.results_as_hash = true
-  return db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'" 
-    
+  return db.execute "UPDATE Players SET Ballance = Ballance + #{amount} WHERE Name = '#{playername}'"     
 end
 #playername = "surething"
 #amount = 10
@@ -592,8 +597,8 @@ end
 #exit -1
 
 def count_winners(log_file, gamenumber, handID, start_cash)
-  #return the number of winners in this hand not counting you, if you didn't loss or win anything return 0
-  # return -1 if you player #1 was the winner
+  #return a positive number of winners in this hand not counting you if you are a looser, if you didn't loss or win anything return 0
+  # return negitive count if you player #1 was the winner with a negitive number returned for the number or loosers
   change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
   if change["1"] == 0
     return 0
@@ -679,23 +684,42 @@ end
 
 def find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir)
   # this looks for account changes in each player including you to find who owes you money or who you owe money to
-  # if you owe money it sends the money to each of them,  if they owe you it records this in there Player account records
+  # if you owe money it sends the money over Stellar net to each of them and records in Players local records.
+  # if they owe you it only records this in there local Players account records
 
   # count_winners return the number positive of number of winners in this hand not counting you, if you didn't loss or win anything return 0
   # return negitve if you player #1 was the winner with negitive count of loosers
   win_count = count_winners(log_file, gamenumber, handID, start_cash)
   if win_count == 0
-    return
+    puts "win_count zero"
+    #return
   end 
   
   puts "win count #{win_count}"
   change = get_cash_change_last_hand(log_file, gamenumber, handID, start_cash)
+  puts "change = #{change}"
   your_change = change["1"]
   puts "your change #{your_change}"
+  # find total all pot winnings when your the winner
+  totalpot = 0
+  other_winners = 0
+  change.each do |y|
+    if y[0] != "1"
+      if y[1] < 0
+        totalpot = totalpot + y[1].abs
+      else
+        other_winners = other_winners + y[1].abs
+      end
+    end
+  end
+  #yourshare_mult = totalpot/other_winners
+  puts "total pot #{totalpot}"
+  puts "other_winners #{other_winners}"
+  
   change.each do |x|
     #puts "#{x}"
     if x[0] != "1"
-      if x[1] > 0
+      if ((x[1] > 0) and (win_count > 0))
         puts "#{x}"
         amount = your_change.abs/win_count.abs
         winner_seat = x[0]
@@ -705,10 +729,10 @@ def find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir
         player_seat_account_add( "1",amount * -1, gamenumber, log_file,account_dir)
       end
       if ((x[1] < 0) and (win_count < 0))
+        
         amount = your_change.abs/win_count.abs
         loosing_seat = x[0]
         puts "player in seat #{loosing_seat} sent you #{amount}"
-        
         results =player_seat_account_ballance(loosing_seat, gamenumber, log_file,account_dir)
         puts "player seat #{loosing_seat} account ballance before player_seat_account_add #{results}"
         # note the amount sent here is a positive numbers now so we will invert it to negitive here 
@@ -721,7 +745,10 @@ def find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir
     end
   end
 end
-
+#@config = get_configs(full_account_log_file)
+#handID = 22
+#find_change_send_record(log_file, gamenumber, handID, start_cash,account_dir)
+#exit -1
 
 
 def send_winning_hands_chips(log_file, gamenumber, handID, start_cash,account_dir)
@@ -857,6 +884,9 @@ def run_loop(log_dir,account_dir)
 end
 
 def update_surething(urlaccountserver)
+  if @config["stellar"]!="Enable"
+    return
+  end
   #url = "poker.surething.biz/player_list"
   #playernick = "test25" 
   to_send = urlaccountserver + "/update.php" 
