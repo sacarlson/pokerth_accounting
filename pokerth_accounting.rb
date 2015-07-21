@@ -228,7 +228,7 @@ def get_configs(full_account_log_file)
         config_hash["paymenturl"]=row[5]
         config_hash["stellarissuer"]=row[6]
         config_hash["accountserver"]=row[7]
-        config_hash["Chip_Mult"]=row[8]
+        config_hash["chip_mult"]=row[8]
         config_hash["stellar"]=row[9]
         config_hash["audio"]=row[10]
         config_hash["loop_time"]=row[11] 
@@ -456,7 +456,7 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
   if @config["stellar"]=="Enable"
     @config = get_configs(account_file)
     amount = amount / @config["chip_mult"]
-    puts "after chip_mult calculation you will be sending #{amount} or currency #{@config["currency"]}"
+    puts "after chip_mult calculation you will be sending #{amount} of currency #{@config["currency"]}"
     send_to_accountid = playername_to_accountID(playername, account_file)
     if send_to_accountid != "notset"
       bal = bal_CHP(send_to_accountid).to_i

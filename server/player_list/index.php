@@ -26,6 +26,11 @@ if (strlen($playernick) < 2) {
   exit;
 }
 
+if (substr($acc, 0,1) !== "g") {
+  echo "first letter of account not g so not valid Stellar account number";
+  exit;
+}
+
 $sql = "REPLACE INTO Players (PlayerNick, AccountID,Date_Created) VALUES ('" . $playernick . "','" . $acc . "',NOW())";
 
 
