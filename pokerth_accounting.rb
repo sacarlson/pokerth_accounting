@@ -183,7 +183,7 @@ end
 
 
 def get_configs(full_account_log_file)
-  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"poker.surething.biz/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}}
+  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"stellar.ddns.net/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}}
   begin    
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
