@@ -62,6 +62,9 @@ end
 def check_db_version(full_account_log_file)
   # this will check to see what user_version of the acounting sqlite database that is now present
   # if it detects an older version it will upgrade it to the new version
+  if !File.exist?(full_account_log_file)
+    return
+  end
   db = SQLite3::Database.open full_account_log_file
   result = db.execute("PRAGMA user_version;")
   #puts "#{result[0][0]}"
@@ -192,6 +195,7 @@ def get_configs(full_account_log_file)
         Name TEXT UNIQUE, Ballance INT DEFAULT 0, AccountID TEXT, master_seed TEXT, AccBal INT DEFAULT 0, AccBalLast INT DEFAULT 0, AccDiff INT DEFAULT 0)"
     db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
         Name TEXT, Amount INT, GameID INT, Log_file TEXT, AccountID TEXT, Time TEXT)"
+
     
     c = db.execute( "SELECT count(*) FROM Configs ")
    
@@ -199,7 +203,7 @@ def get_configs(full_account_log_file)
     exists = c[0][0]
     if exists == 0
       #puts "got here does NOT exist"
-      playernick = get_playernick(log_file)
+      playernick = get_playernick(@full_log_file)
       #puts "playernick from logs = #{playernick}"
       if playernick.nil? 
         puts "playernick return nil we must have a problem with pokerth log file"
@@ -212,6 +216,7 @@ def get_configs(full_account_log_file)
       config_hash["secreet"]=acc_pair["secreet"]
       config_hash["acc_pair"]=acc_pair
       db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
+      check_db_version(full_account_log_file)
     else
       #puts "got here does exist"
       db.execute "PRAGMA journal_mode = WAL"
@@ -223,7 +228,7 @@ def get_configs(full_account_log_file)
         config_hash["playernick"]=row[1]
         config_hash["account"]=row[2]
         config_hash["secret"]=row[3]
-        config_hash["account_pair"]={"account"=>row[2], "secret"=>row[3]} 
+        config_hash["acc_pair"]={"account"=>row[2], "secret"=>row[3]} 
         config_hash["currency"]=row[4]  
         config_hash["paymenturl"]=row[5]
         config_hash["stellarissuer"]=row[6]
@@ -900,7 +905,7 @@ end
 
 
 log_file = find_last_log_file(log_dir)
-full_log_file = log_dir+log_file
+@full_log_file = log_dir+log_file
 check_db_version(full_account_log_file)
 
 @config = get_configs(full_account_log_file)
@@ -921,10 +926,12 @@ if @config["stellar"]=="Enable"
       puts "ok now we got STR #{str} so lets add trust and ask for some CHP from poker.surething.biz"
       puts "add trust stellar issuer #{@config["stellarissuer"]} to pair #{@config["acc_pair"]}"
       add_CHP_trust(@config["stellarissuer"],@config["acc_pair"])
+      sleep 12
       update_surething(@config["accountserver"])
     else
       puts "didn't get any STR from poker.surething.biz so maybe try again later or ask a freind for a loan or??, will exit now and kill pokerth"
       say("sorry we failed to get funding from sure thing,, you will have to find funding elsewhere, we will exit poker now")
+      add_CHP_trust(@config["stellarissuer"],@config["acc_pair"])
       system("killall pokerth")
       exit -1
     end

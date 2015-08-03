@@ -317,7 +317,7 @@ def add_trust(issuer_account,to_pair,currency)
 end
 
 
-def send_currency(from_account_pair, to_account,issuer_account, amount,currency)
+def send_currency(from_account_pair, to_account, issuer_account, amount, currency)
   # pairs {"account"=>"gj5D....","secret"=>"s3x6v...."}
   stellar = Payment.new
   stellar.set_account(from_account_pair["account"])
@@ -333,9 +333,12 @@ end
 
 
 def send_CHP(from_issuer_pair, to_account, amount)
+  # this only works if the issuer is the same as the account sending the CHP
+  # see send_currency if they are not the same 
+  # also must have trust lines already set and active
   # pairs {"account"=>"gj5D....","secret"=>"s3x6v...."}
   currency = "CHP"
-  return send_currency(from_issuer_pair, to_account, amount,currency)  
+  return send_currency(from_issuer_pair, to_account, from_issuer_pair["account"], amount, currency)  
 end
 
 def create_new_account_with_CHP_trust(acc_issuer_pair)
