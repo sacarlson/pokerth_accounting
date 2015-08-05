@@ -95,7 +95,9 @@ def send_surething_player_acc(playernick,stellar_acc,urlaccountserver)
   #url = "poker.surething.biz/player_list"
   #playernick = "test25" 
   #puts "send_sure #{playernick}"
-  postdata = RestClient.get urlaccountserver + "?playernick=" + playernick +"&account="+ stellar_acc
+  senturl = urlaccountserver + "?playernick=" + playernick +"&account="+ stellar_acc
+  puts "senturl = #{senturl}"
+  postdata = RestClient.get senturl
   return JSON.parse(postdata)
 end
 
@@ -186,17 +188,18 @@ end
 
 
 def get_configs(full_account_log_file)
-  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"stellar.ddns.net/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}}
+  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"stellar.ddns.net/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}, "chip_mult"=>"1", "stellar"=>"Enable", "audio"=>"Disable", "mode"=>"Standard"}
   begin    
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
-        PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT)"
+        PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT, Stellar TEXT, Audio TEXT, Loop_Time INT, Mode INT)"
     db.execute "CREATE TABLE IF NOT EXISTS Players(Id INTEGER PRIMARY KEY, 
         Name TEXT UNIQUE, Ballance INT DEFAULT 0, AccountID TEXT, master_seed TEXT, AccBal INT DEFAULT 0, AccBalLast INT DEFAULT 0, AccDiff INT DEFAULT 0)"
     db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
         Name TEXT, Amount INT, GameID INT, Log_file TEXT, AccountID TEXT, Time TEXT)"
+    db.execute("PRAGMA user_version = 1;")   
 
-    
+
     c = db.execute( "SELECT count(*) FROM Configs ")
    
     #puts "c = #{c[0][0]}"
@@ -205,9 +208,14 @@ def get_configs(full_account_log_file)
       #puts "got here does NOT exist"
       playernick = get_playernick(@full_log_file)
       #puts "playernick from logs = #{playernick}"
+      if !ARGV[0].nil?       
+        puts "playernick argument detected as #{ARGV[0]}"
+        playernick = ARGV[0]
+      end
       if playernick.nil? 
         puts "playernick return nil we must have a problem with pokerth log file"
-        puts "make sure you have already started pokerth for some time before running pokerth_accounting.rb or at least have ran it before recently so we have logs to read"
+        puts "make sure you have already ran at least 1 game of pokerth Internet Game before running pokerth_accounting.rb so we have logs to see your poker-heroes.com nick"
+        puts " option if you know your poker-heroes.com nick name, you can add your nick as a command line param in pokerth_accouting.rb yournick "
         exit -1
       end
       acc_pair = create_new_account()
@@ -215,8 +223,8 @@ def get_configs(full_account_log_file)
       config_hash["account"]=acc_pair["account"]
       config_hash["secreet"]=acc_pair["secreet"]
       config_hash["acc_pair"]=acc_pair
-      db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}')"
-      check_db_version(full_account_log_file)
+      db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}', 'Enable', 'Disable', '2', 'Standard')"
+      return config_hash
     else
       #puts "got here does exist"
       db.execute "PRAGMA journal_mode = WAL"
@@ -890,6 +898,7 @@ end
 
 def update_surething(urlaccountserver)
   if @config["stellar"]!="Enable"
+    puts "stellar not enabled no update_sure needed."
     return
   end
   #url = "poker.surething.biz/player_list"
@@ -913,6 +922,7 @@ puts "#{@config}"
 
  # if stellar is disabled we won't need all this stuf checked, only local accounting in sqlite file will be done
 if @config["stellar"]=="Enable"
+  send_surething_player_acc(@config["playernick"],@config["account"],@config["accountserver"])
   str = bal_STR(@config["account"])
   puts "#{str}"
 
