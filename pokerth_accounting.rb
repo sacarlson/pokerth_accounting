@@ -192,7 +192,7 @@ def get_configs(full_account_log_file)
   begin    
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
-        PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT, Stellar TEXT, Audio TEXT, Loop_Time INT, Mode INT)"
+        PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT,Chip_Mult REAL, Stellar TEXT, Audio TEXT, Loop_Time INT, Mode TEXT)"
     db.execute "CREATE TABLE IF NOT EXISTS Players(Id INTEGER PRIMARY KEY, 
         Name TEXT UNIQUE, Ballance INT DEFAULT 0, AccountID TEXT, master_seed TEXT, AccBal INT DEFAULT 0, AccBalLast INT DEFAULT 0, AccDiff INT DEFAULT 0)"
     db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
@@ -223,7 +223,7 @@ def get_configs(full_account_log_file)
       config_hash["account"]=acc_pair["account"]
       config_hash["secreet"]=acc_pair["secreet"]
       config_hash["acc_pair"]=acc_pair
-      db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}', 'Enable', 'Disable', '2', 'Standard')"
+      db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}','1', 'Enable', 'Disable', '2', 'Standard')"
       return config_hash
     else
       #puts "got here does exist"
@@ -891,7 +891,7 @@ def run_loop(log_dir,account_dir)
       break
     end
     # default loop_time is 2 sec
-    sleep(@config["loop_time"])
+    sleep(@config["loop_time"].to_i)
   end
 
 end
