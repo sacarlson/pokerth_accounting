@@ -1,0 +1,11 @@
+#! /bin/sh
+# pokerthacc (c) 2015 Scott Carlson sacarlson_2000@yahoo.com
+
+sudo gem install sys-proctable
+sudo gem install rest-client
+sudo gem install json
+sudo gem install sqlite3
+ln -s /usr/share/pokerthacc/start_set.sh /usr/bin/pokerthacc
+ln -s /usr/share/pokerthacc/view_poker_db.sh /usr/bin/view_poker_db
+echo "completed postinst \n"
+exit 0

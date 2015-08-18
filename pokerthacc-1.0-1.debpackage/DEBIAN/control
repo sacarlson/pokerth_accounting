@@ -1,0 +1,9 @@
+Package: pokerthacc
+Version: 1.0-1
+Architecture: all
+Maintainer: Scott Carlson <sacarlson@ipipi.com>
+Section: base
+Priority: optional
+Depends:  debconf, ruby-full, sqlite3, libsqlite3-dev, ruby-sqlite3, build-essential, sqlitebrowser, pokerth, libttspico-utils
+Description: Setup for a P2P poker system using pokerth and Stellar as the backend for real money:
+ P2P poker system using pokerth a texas holdem poker game, and Stellar backend to play with real money.
