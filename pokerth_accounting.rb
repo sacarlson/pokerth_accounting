@@ -65,6 +65,7 @@ def check_db_version(full_account_log_file)
   if !File.exist?(full_account_log_file)
     return
   end
+  puts "acc_log #{full_account_log_file}"
   db = SQLite3::Database.open full_account_log_file
   result = db.execute("PRAGMA user_version;")
   #puts "#{result[0][0]}"

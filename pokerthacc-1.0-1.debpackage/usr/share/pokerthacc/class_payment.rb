@@ -43,7 +43,8 @@ class Payment
   def create_keys
     data = '{"method":"create_keys"}'
     url = self.server_urlport
-    postdat = RestClient.post url, data
+    #postdat = RestClient.post url, data
+    postdat = RestClient::Resource.new(url, :ssl_ciphers => 'DEFAULT:!DH').post(data)
     data = JSON.parse(postdat)
     @last_key = data
     stat = data["result"]["status"].to_s
@@ -201,7 +202,8 @@ class Payment
     data = '{"method":"account_info","params":[{"account":"'
     send = data + @data["params"][0]["tx_json"]["Account"] + '"}]}'
     url = self.server_urlport
-    postdat = RestClient.post url, send
+    #postdat = RestClient.post url, send
+    postdat = RestClient::Resource.new(url, :ssl_ciphers => 'DEFAULT:!DH').post(send)
     data = JSON.parse(postdat)
     #puts "#{data}}"
     stat = data["result"]["status"].to_s
@@ -227,7 +229,8 @@ class Payment
   def send
     data = self.to_json
     url = self.server_urlport
-    postdat = RestClient.post url, data
+    #postdat = RestClient.post url, data
+    postdat = RestClient::Resource.new(url, :ssl_ciphers => 'DEFAULT:!DH').post(data)
     data = JSON.parse(postdat)
     #stat = data["result"]["status"].to_s
     #puts "send data #{data}"    
@@ -237,7 +240,8 @@ class Payment
   def send_hash(hash)
     data = hash.to_json
     url = self.server_urlport
-    postdat = RestClient.post url, data
+    #postdat = RestClient.post url, data
+    postdat = RestClient::Resource.new(url, :ssl_ciphers => 'DEFAULT:!DH').post(data)
     data = JSON.parse(postdat)
     #puts "#{data}"    
     return data    
