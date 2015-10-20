@@ -4,6 +4,13 @@ require 'sys/proctable'
 include Sys
 require 'sqlite3'
 require './class_payment'
+require 'stellar_utility'
+
+@Utils = Stellar_utility::Utils.new("horizon")
+#@Utils = Stellar_utility::Utils.new()
+puts "Utils version: #{@Utils.version}"
+#puts "configs: #{Utils.configs}"
+
 # this is the main program that run's in the background with pokerth that pools it's sqlite log files
 # to generate payment transactions to other pokerth players Stellar accounts when you loose a hand.
 
@@ -187,13 +194,19 @@ end
 #puts "#{get_playernick(log_file)}"
 #exit -1
 
+def merge_configs(config_hash)
+  config_hash.each do |key,value|
+    @Utils.configs[key] = value
+  end
+end
+
 
 def get_configs(full_account_log_file)
-  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"gLanQde43yv8uyvDyn2Y8jn9C9EuDNb1HF", "accountserver"=>"stellar.ddns.net/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}, "chip_mult"=>"1", "stellar"=>"Enable", "audio"=>"Disable", "mode"=>"Standard"}
+  config_hash = {"playernick"=>"notset", "account"=>"notset", "secreet"=>"notset", "currency"=>"CHP", "paymenturl"=>"test.stellar.org","stellarissuer"=>"GAMB56CPYXJZUM2QSWXTUFSFIWMNHB6GZBUFJ2YJQJRGW6WH223NRLND", "accountserver"=>"stellar.ddns.net/player_list", "new"=>TRUE, "acc_pair"=>{"account"=>"notset","secret"=>"notset"}, "chip_mult"=>"1", "stellar"=>"Enable", "audio"=>"Disable", "mode"=>"V2"}
   begin    
     db = SQLite3::Database.open full_account_log_file
     db.execute "CREATE TABLE IF NOT EXISTS Configs(Id INTEGER PRIMARY KEY, 
-        PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT,Chip_Mult REAL, Stellar TEXT, Audio TEXT, Loop_Time INT, Mode TEXT)"
+        PlayerNick TEXT UNIQUE, AccountID TEXT, master_seed TEXT, Currency TEXT, PaymentURL TEXT,Stellar_Issuer TEXT,Account_serverURL TEXT,Chip_Mult REAL, Stellar TEXT, Audio TEXT, Loop_Time INT, Mode TEXT, Advanced TEXT)"
     db.execute "CREATE TABLE IF NOT EXISTS Players(Id INTEGER PRIMARY KEY, 
         Name TEXT UNIQUE, Ballance INT DEFAULT 0, AccountID TEXT, master_seed TEXT, AccBal INT DEFAULT 0, AccBalLast INT DEFAULT 0, AccDiff INT DEFAULT 0)"
     db.execute "CREATE TABLE IF NOT EXISTS Events(Id INTEGER PRIMARY KEY, 
@@ -219,12 +232,26 @@ def get_configs(full_account_log_file)
         puts " option if you know your poker-heroes.com nick name, you can add your nick as a command line param in pokerth_accouting.rb yournick "
         exit -1
       end
-      acc_pair = create_new_account()
-      config_hash["playernick"]=playernick
-      config_hash["account"]=acc_pair["account"]
-      config_hash["secreet"]=acc_pair["secreet"]
+      #do we still want to support the old create_new_account?  for now any new account will default to be created in new stellar-core format
+      if @config["mode"]="V2"
+        acc_pair = @Utils.create_new_account()
+        config_hash["account"]=acc_pair.address
+        config_hash["secret"]=acc_pair.seed
+      else
+        acc_pair = create_new_account()
+        config_hash["account"]=acc_pair["account"]
+        config_hash["secret"]=acc_pair["secret"]       
+      end
+      config_hash["advanced"] = '{"db_file_path":"/home/sacarlson/github/stellar/stellar_utility/stellar-db2/stellar.db", "url_horizon":"https://horizon-testnet.stellar.org", "url_stellar_core":"http://localhost:8080", "url_mss_server":"localhost:9494", "mode":"horizon", "fee":100, "start_balance":100, "default_network":"Stellar::Networks::TESTNET", "master_keypair":"Stellar::KeyPair.master","extra":"test"}'
       config_hash["acc_pair"]=acc_pair
-      db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{acc_pair["account"]}','#{acc_pair["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}','1', 'Enable', 'Disable', '2', 'Standard')"
+      config_hash["playernick"]=playernick           
+      db.execute "INSERT INTO Configs VALUES(NULL,'#{playernick}','#{config_hash["account"]}','#{config_hash["secret"]}','#{config_hash["currency"]}','#{config_hash["paymenturl"]}','#{config_hash["stellarissuer"]}', '#{config_hash["accountserver"]}','1', 'Enable', 'Disable', '2', 'V2','#{config_hash["advanced"]}')"
+      @Utils.configs["url_horizon"]=config_hash["paymenturl"]
+      advanced = JSON.parse(config_hash["advanced"])
+      puts "advanced: #{advanced}"
+      #@Utils.configs.merge(advanced)
+      merge_configs(advanced)
+      puts "configs #{@Utils.configs}"  
       return config_hash
     else
       #puts "got here does exist"
@@ -237,7 +264,7 @@ def get_configs(full_account_log_file)
         config_hash["playernick"]=row[1]
         config_hash["account"]=row[2]
         config_hash["secret"]=row[3]
-        config_hash["acc_pair"]={"account"=>row[2], "secret"=>row[3]} 
+        config_hash["acc_pair"]={"account"=>config_hash["account"], "secret"=>config_hash["secret"]} 
         config_hash["currency"]=row[4]  
         config_hash["paymenturl"]=row[5]
         config_hash["stellarissuer"]=row[6]
@@ -246,10 +273,11 @@ def get_configs(full_account_log_file)
         config_hash["stellar"]=row[9]
         config_hash["audio"]=row[10]
         config_hash["loop_time"]=row[11] 
-        config_hash["mode"]=row[12]      
-      end   
+        config_hash["mode"]=row[12]
+        config_hash["advanced"] = row[13]      
+      end      
     end
-
+    
   rescue SQLite3::Exception => e 
     
     puts "Exception occurred in get_configs "
@@ -259,6 +287,12 @@ def get_configs(full_account_log_file)
     db.close if db
   end
   db.close if db
+  @Utils.configs["url_horizon"]=config_hash["paymenturl"]
+  advanced = JSON.parse(config_hash["advanced"])
+  puts "advanced: #{advanced}"
+  #@Utils.configs.merge(advanced)
+  merge_configs(advanced)
+  puts "configs #{@Utils.configs}"  
   return config_hash
 end
 
@@ -485,10 +519,10 @@ def send_player_chips( seat, amount, gamenumber, log_file,account_dir)
         #puts "issuer #{@config["stellarissuer"]}"
         result = send_currency(from_account_pair, send_to_accountid, @config["stellarissuer"], amount, @config["currency"])
         #puts "#{result}"
-        sleep 12
-        stellar = Payment.new
-        stellar.set_account(send_to_accountid)
-        data = stellar.account_lines
+        #sleep 12
+        #stellar = Payment.new
+        #stellar.set_account(send_to_accountid)
+        #data = stellar.account_lines
         #puts "after deposit lines #{data}"
       else
         puts "winner #{playername} didn't have required CHP funds or lines of credit to allow payment, must have more than zero"
@@ -914,14 +948,16 @@ def update_surething(urlaccountserver)
   #return JSON.parse(postdata)
 end
 
-
+#start program ********************************************************************************
 
 log_file = find_last_log_file(log_dir)
 @full_log_file = log_dir+log_file
 check_db_version(full_account_log_file)
 
+#we will force default to new stellar-core V2 mode here,  if you still want to support the old stellar you can still set this to "standard" or "V1" in configs
+@config = { "mode"=>"V2"}
 @config = get_configs(full_account_log_file)
-puts "#{@config}"
+puts "@config: #{@config}"
 
  # if stellar is disabled we won't need all this stuf checked, only local accounting in sqlite file will be done
 if @config["stellar"]=="Enable"

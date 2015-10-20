@@ -12,7 +12,7 @@ require './class_payment'
   stellar.set_destination("gBuYT5AQpjw1mEiDBJNJshtV3GyV5A2UKA")
   stellar.set_issuer(issuer_account)
   stellar.set_currency("USD")
-  stellar.set_value(1)
+  stellar.set_value(100000)
   results = stellar.static_path_find
   puts "#{results}"
   puts " "

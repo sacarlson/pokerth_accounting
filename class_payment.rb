@@ -250,12 +250,16 @@ end
 #end class Payment ..................................
 
 def create_new_account()
-  new_pair = {"account"=>"ghr1b....", "secret"=>"s3x6v....."}
-  stellar = Payment.new
-  stellar.create_keys
-  new_pair["account"] = stellar.last_key_account_id
-  new_pair["secret"] = stellar.last_key_master_seed 
-  return new_pair
+  if @config["mode"]="V2"
+    return  @Utils.create_new_account()
+  else
+    new_pair = {"account"=>"ghr1b....", "secret"=>"s3x6v....."}
+    stellar = Payment.new
+    stellar.create_keys
+    new_pair["account"] = stellar.last_key_account_id
+    new_pair["secret"] = stellar.last_key_master_seed 
+    return new_pair
+  end
 end
 
 def create_new_active_account(acc_issuer_pair)
@@ -289,60 +293,87 @@ def create_new_active_account(acc_issuer_pair)
 end
 
 def send_native(from_issuer_pair, to_account, amount)
-  stellar = Payment.new
-  #puts "from account #{from_issuer_pair["account"]}"
-  stellar.set_account(from_issuer_pair["account"])
-  stellar.set_secret(from_issuer_pair["secret"])
-  stellar.set_currency("native")
-  #stellar.set_issuer(from_issuer_pair["account"])
-  stellar.set_value(amount)
-  #stellar.set_DestinationTag(124)
-  stellar.set_destination(to_account)
-  status = stellar.send_currency
-  #puts "status = #{status}"
-  return status
+  if @config["mode"]="V2"
+    #in case we forgot to convert to the new system of stellar that already does this conversion from stroops
+    #if we ever need to do transactions bigger than this then we best use Utils direct
+    if amount > 1000000
+      amount = amount / 1000000
+    end
+    #note from_issuer_pair here is in Stellar::Keypair structure format in V2
+    return @Utils.send_native(from_issuer_pair, to_account, amount)
+  else
+    stellar = Payment.new
+    #puts "from account #{from_issuer_pair["account"]}"
+    stellar.set_account(from_issuer_pair["account"])
+    stellar.set_secret(from_issuer_pair["secret"])
+    stellar.set_currency("native")
+    #stellar.set_issuer(from_issuer_pair["account"])
+    stellar.set_value(amount)
+    #stellar.set_DestinationTag(124)
+    stellar.set_destination(to_account)
+    status = stellar.send_currency
+    #puts "status = #{status}"
+    return status
+  end
 end
 
 
 def add_CHP_trust(issuer_account,to_pair)
-  # this will setup trust to accept CHP currency from from_issuer account to to_pair hash {"account"=>"gj5D....","secret"=>"s3x6v...."} 
+  # this will setup trust to accept CHP currency from from_issuer account to to_pair hash {"account"=>"gj5D....","secret"=>"s3x6v...."}   
   currency = "CHP"
   return add_trust(issuer_account,to_pair,currency)
 end
 
 def add_trust(issuer_account,to_pair,currency)
+  #note in V2 we get to_pair from @config["secret"]
   # this will setup trust to accept CHP currency from from_issuer_pair account to to_pair hash {"account"=>"gj5D....","secret"=>"s3x6v...."} 
-  stellar = Payment.new
-  stellar.set_issuer(issuer_account)
-  stellar.set_currency(currency)
-  stellar.set_account(to_pair["account"])
-  stellar.set_secret(to_pair["secret"])
-  stellar.set_trust
+  if @config["mode"]="V2"
+    to_pair = Stellar::KeyPair.from_seed(@config["secret"])
+    return @Utils.add_trust(issuer_account,to_pair,currency)
+  else
+    stellar = Payment.new
+    stellar.set_issuer(issuer_account)
+    stellar.set_currency(currency)
+    stellar.set_account(to_pair["account"])
+    stellar.set_secret(to_pair["secret"])
+    stellar.set_trust
+  end
 end
 
 
 def send_currency(from_account_pair, to_account, issuer_account, amount, currency)
-  # pairs {"account"=>"gj5D....","secret"=>"s3x6v...."}
-  stellar = Payment.new
-  stellar.set_account(from_account_pair["account"])
-  stellar.set_secret(from_account_pair["secret"])
-  stellar.set_currency(currency)
-  stellar.set_issuer(issuer_account)
-  stellar.set_value(amount)
-  stellar.set_destination(to_account)
-  status = stellar.send_currency
-  #puts "status = #{status}"
-  return status
+  if @config["mode"]="V2"
+    from_account_pair =  Stellar::KeyPair.from_seed(@config["secret"])
+    return @Utils.send_currency(from_account_pair, to_account, issuer_account, amount, currency)
+  else
+    # pairs {"account"=>"gj5D....","secret"=>"s3x6v...."}
+    stellar = Payment.new
+    stellar.set_account(from_account_pair["account"])
+    stellar.set_secret(from_account_pair["secret"])
+    stellar.set_currency(currency)
+    stellar.set_issuer(issuer_account)
+    stellar.set_value(amount)
+    stellar.set_destination(to_account)
+    status = stellar.send_currency
+    #puts "status = #{status}"
+    return status
+  end
 end
 
 
 def send_CHP(from_issuer_pair, to_account, amount)
-  # this only works if the issuer is the same as the account sending the CHP
-  # see send_currency if they are not the same 
-  # also must have trust lines already set and active
-  # pairs {"account"=>"gj5D....","secret"=>"s3x6v...."}
-  currency = "CHP"
-  return send_currency(from_issuer_pair, to_account, from_issuer_pair["account"], amount, currency)  
+  if @config["mode"]="V2"
+    puts "seed: #{@config["secret"]}"
+    from_account_pair =  Stellar::KeyPair.from_seed(@config["secret"])
+    return @Utils.send_currency(from_issuer_pair, to_account, from_issuer_pair.address, amount, "CHP")
+  else
+    # this only works if the issuer is the same as the account sending the CHP
+    # see send_currency if they are not the same 
+    # also must have trust lines already set and active
+    # pairs {"account"=>"gj5D....","secret"=>"s3x6v...."}
+    currency = "CHP"
+    return send_currency(from_issuer_pair, to_account, from_issuer_pair["account"], amount, currency)
+  end  
 end
 
 def create_new_account_with_CHP_trust(acc_issuer_pair)
@@ -365,55 +396,35 @@ def check_bal(account)
 end
 
 def bal_STR(account)
-  stellar = Payment.new
-  stellar.set_account(account)
-  data = stellar.check_balance
-  #puts "native ballance #{data}"
-  return data
+  if @config["mode"]="V2"
+    return @Utils.get_native_balance(account)
+  else
+    stellar = Payment.new
+    stellar.set_account(account)
+    data = stellar.check_balance
+    #puts "native ballance #{data}"
+    return data
+  end
 end
 
 def bal_CHP(account)
-  stellar = Payment.new
-  stellar.set_account(account)
-  data = stellar.account_lines
-  #puts "#{data}"
-  if data["result"]["lines"] == []
-    return 0
-  else  
-    #puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
-    return data["result"]["lines"][0]["balance"]
+  if @config["mode"]="V2"
+    return @Utils.get_lines_balance(account,@config["stellarissuer"],@config["currency"])
+  else
+    stellar = Payment.new
+    stellar.set_account(account)
+    data = stellar.account_lines
+   #puts "#{data}"
+    if data["result"]["lines"] == []
+      return 0
+    else  
+      #puts "CHP ballance = #{data["result"]["lines"][0]["balance"]}"
+      return data["result"]["lines"][0]["balance"]
+    end
   end
 end
 
 __END__
-# examples
-stellar = Payment.new
-#data = stellar.create_keys
-#puts "#{stellar.last_key_account_id}"
-#puts "#{stellar.last_key_master_seed}"
-#puts "#{data}"
-#exit -1
-#stellar.set_value(250)
-#stellar.set_issuer("")
-#stellar.set_currency("native")
-
-#stellar.set_account("gJ5DqfJ3czPJVoaW6hZsQEyowpehesgM5E")
-stellar.set_account("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
-#stellar.set_destination("ghr1Bkm4RYLu3k24oPeQVsZ41rJiy9tNza")
-
-data = stellar.check_balance
-puts "#{data}"
-
-puts "#{stellar.send_currency}"
-
-sleep 10
-puts "#{stellar.check_balance}"
-#stellar.show
-#stellar.set_server_live
-#puts "#{stellar.server_urlport}"
-
-#puts "#{stellar.to_json}"
-
 
 
 
