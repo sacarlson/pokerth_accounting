@@ -1,6 +1,6 @@
 GIT
   remote: git@github.com:sacarlson/stellar_utility.git
-  revision: 7ba778f92c6e322837810fcb2d49cc585b47c733
+  revision: cac2f13d3c881481944713c6945c32f681d97381
   specs:
     stellar_utility (0.1.0)
       faraday
@@ -33,7 +33,7 @@ GEM
     diff-lcs (1.2.5)
     digest-crc (0.4.1)
     docile (1.1.5)
-    domain_name (0.5.24)
+    domain_name (0.5.25)
       unf (>= 0.0.5, < 1.0.0)
     faraday (0.9.2)
       multipart-post (>= 1.2, < 3)
@@ -44,15 +44,15 @@ GEM
       domain_name (~> 0.5)
     i18n (0.7.0)
     json (1.8.3)
-    mime-types (2.6.1)
-    minitest (5.8.1)
+    mime-types (2.6.2)
+    minitest (5.8.2)
     multipart-post (2.0.0)
     mysql (2.9.1)
-    netrc (0.10.3)
+    netrc (0.11.0)
     pg (0.18.3)
     rbnacl (3.2.0)
       ffi
-    rbnacl-libsodium (1.0.4)
+    rbnacl-libsodium (1.0.6)
       rbnacl (~> 3.0, >= 3.0.1)
     rest-client (1.8.0)
       http-cookie (>= 1.0.2, < 2.0)
@@ -77,7 +77,7 @@ GEM
       json (~> 1.8)
       simplecov-html (~> 0.10.0)
     simplecov-html (0.10.0)
-    sqlite3 (1.3.10)
+    sqlite3 (1.3.11)
     stellar-base (0.7.0)
       activesupport (~> 4)
       base32

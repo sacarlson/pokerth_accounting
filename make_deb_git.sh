@@ -1,6 +1,6 @@
 #! /bin/sh
 package="pokerthacc"
-version="-1.0-1"
+version="-1.0-2"
 rm -rf ./tmp
 cp -a "$package""$version".debpackage ./tmp
 if [ -d ./tmp ]; then

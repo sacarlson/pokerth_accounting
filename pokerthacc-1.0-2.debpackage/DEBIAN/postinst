@@ -1,0 +1,10 @@
+#! /bin/sh
+# pokerthacc (c) 2015 Scott Carlson sacarlson_2000@yahoo.com
+
+sudo gem install bundler
+cd /usr/share/pokerthacc
+bundle install
+ln -s -f /usr/share/pokerthacc/start_set_bdr.sh /usr/bin/pokerthacc
+ln -s -f /usr/share/pokerthacc/view_poker_db.sh /usr/bin/view_poker_db
+echo "completed postinst \n"
+exit 0

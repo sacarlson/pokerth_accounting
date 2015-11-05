@@ -1,1 +1,0 @@
-/home/sacarlson/github/pokerth_accounting/class_payment.rb

@@ -1,0 +1,94 @@
+#done
+ result = send_currency(from_account_pair, send_to_accountid, @config["stellarissuer"], amount, @config["currency"])
+from_account_pair =  Stellar::KeyPair.from_seed(@config["secret"])
+result = @Utils.send_currency(from_account_pair, to_account_pair, issuer_pair, amount, currency)
+
+#done
+add_CHP_trust(@config["stellarissuer"],@config["acc_pair"])
+to_pair = Stellar::KeyPair.from_seed(@config["secret"])
+@Utils.add_trust(issuer_account,to_pair,"CHP")
+
+#done
+acc_pair = create_new_account()
+acc_pair = @Utils.create_new_account()
+
+#done
+bal = bal_CHP(@config["account"]).to_i
+bal = @Utils.get_lines_balance(@config["account"],@config["stellarissuer"],@config["currency")
+
+#done
+bal = bal_STR(account)
+bal = @Utils.get_native_balance(account)
+
+#done
+send_CHP(from_issuer_pair, acc, amount)
+from_account_pair =  Stellar::KeyPair.from_seed(@config["secret"])
+result = @Utils.send_currency(from_account_pair, acc, from_account_pair.address, amount, "CHP")
+
+
+#done
+send_native(from_issuer_pair, acc, amount)
+@Utils.send_native(from_pair, to_account, amount)
+
+
+#just reference
+if @config["mode"]="V2"
+    return @Utils.get_lines_balance(@config["account"],@config["stellarissuer"],@config["currency")
+  else
+
+#done
+#need to import some of these into @Utils.configs
+
+ config_hash["new"]=FALSE
+        config_hash["playernick"]=row[1]
+        config_hash["account"]=row[2]
+        config_hash["secret"]=row[3]
+        config_hash["acc_pair"]={"account"=>row[2], "secret"=>row[3]} 
+        config_hash["currency"]=row[4]  
+        config_hash["paymenturl"]=row[5]
+        config_hash["stellarissuer"]=row[6]
+        config_hash["accountserver"]=row[7]
+        config_hash["chip_mult"]=row[8]
+        config_hash["stellar"]=row[9]
+        config_hash["audio"]=row[10]
+        config_hash["loop_time"]=row[11] 
+        config_hash["mode"]=row[12] 
+
+   config_hash["paymenturl"]=row[5]
+    config_hash["accountserver"]=row[7]
+config_hash["stellar"]=row[9]
+
+#done
+@Utils.configs["url_horizon"]=@config["paymenturl"]
+
+#done
+#this needs to be exported and put into table Configs Advanced in json format
+---
+db_file_path: /home/sacarlson/github/stellar/stellar_utility/stellar-db2/stellar.db
+url_horizon: https://horizon-testnet.stellar.org
+url_stellar_core: http://localhost:8080
+url_mss_server: "ws://localhost:9494"
+mode: localcore
+fee: 100
+start_balance: 100
+default_network: Stellar::Networks::TESTNET
+master_keypair: Stellar::KeyPair.master
+mss_bind: '0.0.0.0'
+mss_port: 9494
+mss_db_mode: "sqlite"
+mss_db_file_path: "./multisign.db"
+version: "7f11ad9225010cd7bb6e8d96cf64a85a70750f13"
+core_version: "b2b1ae0c700c5576eabacf54cba3ee0e8a4e10cc"
+fundingkeypair_seed: "SCROKYZNDSQOV2IUODTI77EHEXL4LIF5MNZWWB3EJTDOD2TPEWVH3M46"
+
+
+#add some lunes funding to this account at least 10,000
+new CHP issuer: seed: SCROKYZNDSQOV2IUODTI77EHEXL4LIF5MNZWWB3EJTDOD2TPEWVH3M46
+address: GAMB56CPYXJZUM2QSWXTUFSFIWMNHB6GZBUFJ2YJQJRGW6WH223NRLND
+
+
+#done
+config file for funder needs real valid seed
+
+#done
+modify default config_hash["stellarissuer"]=row[6]

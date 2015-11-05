@@ -365,7 +365,8 @@ def send_CHP(from_issuer_pair, to_account, amount)
   if @config["mode"]="V2"
     puts "seed: #{@config["secret"]}"
     from_account_pair =  Stellar::KeyPair.from_seed(@config["secret"])
-    return @Utils.send_currency(from_issuer_pair, to_account, from_issuer_pair.address, amount, "CHP")
+    #return @Utils.send_currency(from_issuer_pair, to_account, from_issuer_pair.address, amount, "CHP")
+    return @Utils.send_currency(from_account_pair, to_account, @config["stellarissuer"], amount, "CHP")
   else
     # this only works if the issuer is the same as the account sending the CHP
     # see send_currency if they are not the same 
